@@ -49,7 +49,7 @@ $config->setRiskyAllowed(true)
             'ignored_tags' => ['todo', 'var'],
         ],
         'trailing_comma_in_multiline' => ['elements' => ['arrays', /*'arguments', 'parameters' */]],
-        'modernize_strpos' => false, // remove when min requirement PHP 8
+        'modernize_strpos' => true,
     ])
     ->setFinder($finder);
 

@@ -1,5 +1,15 @@
 # Upgrade
 
+## 0.11.0
+
+### Increased minimum PHP version to 8.2
+
+The minimum PHP version was increased from 7.3 to 8.2.
+
+### Increased minimum Sulu version to 2.6
+
+The minimum Sulu version was increased from 2.4 to 2.6.
+
 ## 0.10.0
 
 ### Add extension placeholder to serialized medias
