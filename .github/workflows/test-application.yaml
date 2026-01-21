@@ -22,23 +22,9 @@ jobs:
             fail-fast: false
             matrix:
                 include:
-                    - php-version: '8.0'
-                      coverage: false
-                      dependency-versions: 'lowest'
-                      tools: 'composer:v2'
-                      env:
-                          SYMFONY_DEPRECATIONS_HELPER: weak
-
-                    - php-version: '8.1'
-                      coverage: false
-                      dependency-versions: 'highest'
-                      tools: 'composer:v2'
-                      env:
-                          SYMFONY_DEPRECATIONS_HELPER: weak
-
                     - php-version: '8.2'
                       coverage: false
-                      dependency-versions: 'highest'
+                      dependency-versions: 'lowest'
                       tools: 'composer:v2'
                       env:
                           SYMFONY_DEPRECATIONS_HELPER: weak
@@ -52,6 +38,14 @@ jobs:
 
                     - php-version: '8.4'
                       coverage: true
+                      dependency-versions: 'highest'
+                      tools: 'composer:v2'
+                      composer-options: '--ignore-platform-reqs'
+                      env:
+                          SYMFONY_DEPRECATIONS_HELPER: weak
+
+                    - php-version: '8.5'
+                      coverage: false
                       dependency-versions: 'highest'
                       tools: 'composer:v2'
                       composer-options: '--ignore-platform-reqs'
