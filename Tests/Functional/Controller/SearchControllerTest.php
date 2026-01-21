@@ -62,7 +62,7 @@ class SearchControllerTest extends BaseTestCase
     /**
      * @return \Generator<mixed[]>
      */
-    public function provideAttributes(): \Generator
+    public static function provideAttributes(): \Generator
     {
         yield [
             'massive',

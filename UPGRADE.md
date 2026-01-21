@@ -1,5 +1,11 @@
 # Upgrade
 
+## 0.11.0
+
+### Increased minimum PHP version to 8.0
+
+The minimum PHP version was increased from 7.3 to 8.0.
+
 ## 0.10.0
 
 ### Add extension placeholder to serialized medias

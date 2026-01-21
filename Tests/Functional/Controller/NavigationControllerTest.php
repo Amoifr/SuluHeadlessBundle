@@ -110,7 +110,7 @@ class NavigationControllerTest extends BaseTestCase
     /**
      * @return \Generator<mixed[]>
      */
-    public function provideAttributes(): \Generator
+    public static function provideAttributes(): \Generator
     {
         $path = '';
 
@@ -119,7 +119,7 @@ class NavigationControllerTest extends BaseTestCase
         /* Todo Can be removed after ending support of sulu 2.5 */
         if ($suluSuluVersion
             && \version_compare($suluSuluVersion, '2.6.0', '<')
-            && 0 !== \strpos($suluSuluVersion, 'dev-')
+            && !\str_starts_with($suluSuluVersion, 'dev-')
         ) {
             $path = '/legacy/';
         }
