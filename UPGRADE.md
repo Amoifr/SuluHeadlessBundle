@@ -1,5 +1,70 @@
 # Upgrade
 
+## 3.0.0
+
+### Increased minimum Sulu version to 3.0
+
+The minimum Sulu version was increased from 2.6 to 3.0.
+
+### Increased minimum Symfony version to 6.4
+
+Symfony 5.4 support was dropped. Minimum required version is now 6.4.
+
+### Response format changes
+
+- `nodeType` removed, replaced with `linkType` (contains link provider name or `null` for regular pages)
+- `linkType` added to navigation items (contains link provider name or `null` for regular pages)
+- `path` removed from navigation responses
+- `excerpt.images` renamed to `excerpt.image` (returns single object or `null` instead of array)
+- `excerpt.icon` now returns single object or `null` instead of array
+- Search endpoint now uses SEAL search engine instead of Massive SearchBundle
+- Search `indices` query parameter replaced with `index` (single index, defaults to `website`)
+- Search response structure changed from nested `_embedded.hits[].document` to flat `_embedded.hits[]`
+- Search hit `imageUrl` field replaced with `media` (contains full serialized media object or `null`)
+- Search hit `score` field removed
+- Search hit `document.properties` (excerpt, state, etc.) removed — no longer included in response
+- Search hit fields changed: `id`, `title`, `url`, `locale` remain; new fields: `resourceKey`, `resourceId`, `content`, `authoredAt`, `webspaces`, `_formatted`, `media`
+
+### StructureResolverInterface signature changed
+
+The `StructureResolverInterface` now uses `DimensionContentInterface` instead of `StructureInterface`:
+
+```php
+// Before
+public function resolve(StructureInterface $structure, string $locale, bool $includeExtension = true): array;
+
+// After
+public function resolve(DimensionContentInterface $dimensionContent, string $locale, bool $includeExtension = true): array;
+```
+
+### ContentTypeResolverInterface signature changed
+
+All content type resolvers now receive `FieldMetadata` instead of `PropertyInterface`:
+
+```php
+// Before
+public function resolve($data, PropertyInterface $property, string $locale, array $attributes = []): ContentView;
+
+// After
+public function resolve(mixed $data, FieldMetadata $fieldMetadata, string $locale, array $attributes = []): ContentView;
+```
+
+### ResourceLocatorResolver removed
+
+The `ResourceLocatorResolver` content type resolver has been removed.
+
+### DataProviderResolverInterface namespace change
+
+The `ProviderConfigurationInterface` import changed:
+
+```php
+// Before
+use Sulu\Component\SmartContent\Configuration\ProviderConfigurationInterface;
+
+// After
+use Sulu\Bundle\AdminBundle\SmartContent\Configuration\ProviderConfigurationInterface;
+```
+
 ## 0.11.0
 
 ### Increased minimum PHP version to 8.2

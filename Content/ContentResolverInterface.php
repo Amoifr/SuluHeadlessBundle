@@ -13,13 +13,12 @@ declare(strict_types=1);
 
 namespace Sulu\Bundle\HeadlessBundle\Content;
 
-use Sulu\Component\Content\Compat\PropertyInterface;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
 
 interface ContentResolverInterface
 {
     /**
-     * @param mixed $data
-     * @param mixed[] $attributes
+     * @param array<string, mixed> $attributes
      */
-    public function resolve($data, PropertyInterface $property, string $locale, array $attributes = []): ContentView;
+    public function resolve(mixed $data, FieldMetadata $fieldMetadata, string $locale, array $attributes = []): ContentView;
 }

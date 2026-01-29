@@ -1,0 +1,24 @@
+{
+    "_embedded": {
+        "hits": [
+            {
+                "_formatted": {
+                    "content": null,
+                    "title": "<mark>SEAL</mark> is awesome"
+                },
+                "authoredAt": "@string@.isDateTime()",
+                "content": [],
+                "id": "@string@",
+                "locale": "de",
+                "media": null,
+                "resourceId": "@uuid@",
+                "resourceKey": "pages",
+                "title": "SEAL is awesome",
+                "url": "/awesome-seal",
+                "webspaces": [
+                    "sulu_io"
+                ]
+            }
+        ]
+    }
+}

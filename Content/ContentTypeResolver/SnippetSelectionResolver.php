@@ -13,93 +13,85 @@ declare(strict_types=1);
 
 namespace Sulu\Bundle\HeadlessBundle\Content\ContentTypeResolver;
 
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
 use Sulu\Bundle\HeadlessBundle\Content\ContentView;
 use Sulu\Bundle\HeadlessBundle\Content\StructureResolverInterface;
-use Sulu\Bundle\SnippetBundle\Document\SnippetDocument;
-use Sulu\Bundle\SnippetBundle\Snippet\DefaultSnippetManagerInterface;
-use Sulu\Component\Content\Compat\PropertyInterface;
-use Sulu\Component\Content\Compat\Structure\SnippetBridge;
-use Sulu\Component\Content\Compat\Structure\StructureBridge;
-use Sulu\Component\Content\Mapper\ContentMapperInterface;
-use Sulu\Component\DocumentManager\Exception\DocumentNotFoundException;
+use Sulu\Content\Application\ContentAggregator\ContentAggregatorInterface;
+use Sulu\Content\Domain\Model\DimensionContentInterface;
+use Sulu\Snippet\Domain\Repository\SnippetAreaRepositoryInterface;
+use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
 
 class SnippetSelectionResolver implements ContentTypeResolverInterface
 {
-    /**
-     * @var StructureResolverInterface
-     */
-    private $structureResolver;
-
-    /**
-     * @var ContentMapperInterface
-     */
-    private $contentMapper;
-
-    /**
-     * @var DefaultSnippetManagerInterface
-     */
-    private $defaultSnippetManager;
-
-    public function __construct(
-        ContentMapperInterface $contentMapper,
-        StructureResolverInterface $structureResolver,
-        DefaultSnippetManagerInterface $defaultSnippetManager
-    ) {
-        $this->contentMapper = $contentMapper;
-        $this->structureResolver = $structureResolver;
-        $this->defaultSnippetManager = $defaultSnippetManager;
-    }
-
     public static function getContentType(): string
     {
         return 'snippet_selection';
     }
 
-    public function resolve($data, PropertyInterface $property, string $locale, array $attributes = []): ContentView
+    public function __construct(
+        private SnippetRepositoryInterface $snippetRepository,
+        private StructureResolverInterface $structureResolver,
+        private ContentAggregatorInterface $contentAggregator,
+        private SnippetAreaRepositoryInterface $snippetAreaRepository,
+    ) {
+    }
+
+    public function resolve(mixed $data, FieldMetadata $fieldMetadata, string $locale, array $attributes = []): ContentView
     {
-        /** @var StructureBridge $structure */
-        $structure = $property->getStructure();
-        $webspaceKey = $structure->getWebspaceKey();
-        $shadowLocale = $structure->getIsShadow() ? $structure->getShadowBaseLanguage() : null;
+        /** @var string|null $webspaceKey */
+        $webspaceKey = $attributes['webspaceKey'] ?? null;
+        /** @var string|null $shadowLocale */
+        $shadowLocale = ($attributes['isShadow'] ?? false) ? ($attributes['shadowLocale'] ?? null) : null;
 
-        $params = $property->getParams();
-        /** @var bool $includeExtension */
-        $includeExtension = isset($params['loadExcerpt']) ? $params['loadExcerpt']->getValue() : false;
-        /** @var string $defaultArea */
-        $defaultArea = isset($params['default']) ? $params['default']->getValue() : null;
+        $includeExtension = false;
+        $defaultArea = null;
+        foreach ($fieldMetadata->getOptions() as $option) {
+            if ('loadExcerpt' === $option->getName()) {
+                $includeExtension = (bool) $option->getValue();
+            }
+            if ('default' === $option->getName()) {
+                $optionValue = $option->getValue();
+                $defaultArea = \is_string($optionValue) || \is_int($optionValue) ? (string) $optionValue : null;
+            }
+        }
 
+        /** @var array<string> $snippetIds */
         $snippetIds = \is_array($data) ? $data : [];
-        if (empty($snippetIds) && $defaultArea) {
-            $defaultSnippetId = $this->defaultSnippetManager->loadIdentifier($webspaceKey, $defaultArea);
+
+        if (empty($snippetIds) && null !== $defaultArea && null !== $webspaceKey) {
+            $snippetArea = $this->snippetAreaRepository->findOneBy([
+                'webspaceKey' => $webspaceKey,
+                'areaKey' => $defaultArea,
+            ]);
+            $defaultSnippetId = $snippetArea?->getSnippet()?->getUuid();
             $snippetIds = $defaultSnippetId ? [$defaultSnippetId] : [];
         }
 
-        $snippets = [];
-        foreach ($snippetIds as $snippetId) {
-            try {
-                /** @var SnippetBridge $snippet */
-                $snippet = $this->contentMapper->load($snippetId, $webspaceKey, $locale);
-            } catch (DocumentNotFoundException $e) {
-                continue;
-            }
-
-            if (!$snippet->getHasTranslation() && null !== $shadowLocale) {
-                /** @var SnippetBridge $snippet */
-                $snippet = $this->contentMapper->load($snippetId, $webspaceKey, $shadowLocale);
-                /** @var SnippetDocument $document */
-                $document = $snippet->getDocument();
-                $document->setLocale($shadowLocale);
-                $document->setOriginalLocale($locale);
-            }
-
-            $snippet->setIsShadow(null !== $shadowLocale);
-            /** @var string $shadowBaseLanguage */
-            $shadowBaseLanguage = $shadowLocale;
-            $snippet->setShadowBaseLanguage($shadowBaseLanguage);
-
-            $snippets[] = $this->structureResolver->resolve($snippet, $locale, $includeExtension);
+        if (empty($snippetIds)) {
+            return new ContentView([], ['ids' => []]);
         }
 
-        return new ContentView($snippets, ['ids' => $snippetIds ?: []]);
+        $loadLocale = $shadowLocale ?? $locale;
+        $snippetEntities = $this->snippetRepository->findBy(
+            [
+                'uuids' => $snippetIds,
+                'locale' => $loadLocale,
+                'stage' => DimensionContentInterface::STAGE_LIVE,
+                'load_ghost_content' => true,
+            ],
+            [],
+            [SnippetRepositoryInterface::GROUP_SELECT_SNIPPET_WEBSITE => true],
+        );
+
+        $snippets = [];
+        foreach ($snippetEntities as $snippet) {
+            $dimensionContent = $this->contentAggregator->aggregate(
+                $snippet,
+                ['locale' => $loadLocale, 'stage' => DimensionContentInterface::STAGE_LIVE],
+            );
+            $snippets[] = $this->structureResolver->resolve($dimensionContent, $locale, $includeExtension);
+        }
+
+        return new ContentView($snippets, ['ids' => $snippetIds]);
     }
 }

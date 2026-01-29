@@ -15,106 +15,68 @@ namespace Sulu\Bundle\HeadlessBundle\Controller;
 
 use JMS\Serializer\SerializationContext;
 use JMS\Serializer\SerializerInterface;
+use Sulu\Bundle\HeadlessBundle\Content\Serializer\CategorySerializerInterface;
 use Sulu\Bundle\HeadlessBundle\Content\Serializer\MediaSerializerInterface;
 use Sulu\Bundle\HttpCacheBundle\Cache\SuluHttpCache;
-use Sulu\Bundle\WebsiteBundle\Navigation\NavigationMapperInterface;
-use Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStoreInterface;
+use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
 use Sulu\Component\Rest\ListBuilder\CollectionRepresentation;
-use Sulu\Component\Rest\RequestParametersTrait;
-use Sulu\Component\Webspace\Analyzer\Attributes\RequestAttributes;
-use Sulu\Component\Webspace\Webspace;
+use Sulu\Component\Webspace\Analyzer\RequestAnalyzerInterface;
+use Sulu\Component\Webspace\Segment;
+use Sulu\Page\Domain\Repository\NavigationRepositoryInterface;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class NavigationController
 {
-    use RequestParametersTrait;
-
-    /**
-     * @var NavigationMapperInterface
-     */
-    private $navigationMapper;
-
-    /**
-     * @var SerializerInterface
-     */
-    private $serializer;
-
-    /**
-     * @var MediaSerializerInterface
-     */
-    private $mediaSerializer;
-
-    /**
-     * @var ReferenceStoreInterface
-     */
-    private $navigationReferenceStore;
-
-    /**
-     * @var int
-     */
-    private $maxAge;
-
-    /**
-     * @var int
-     */
-    private $sharedMaxAge;
-
-    /**
-     * @var int
-     */
-    private $cacheLifetime;
-
     public function __construct(
-        NavigationMapperInterface $navigationMapper,
-        SerializerInterface $serializer,
-        MediaSerializerInterface $mediaSerializer,
-        ReferenceStoreInterface $pageReferenceStore,
-        int $maxAge,
-        int $sharedMaxAge,
-        int $cacheLifetime
+        private NavigationRepositoryInterface $navigationRepository,
+        private SerializerInterface $serializer,
+        private ReferenceStoreInterface $navigationReferenceStore,
+        private RequestAnalyzerInterface $requestAnalyzer,
+        private MediaSerializerInterface $mediaSerializer,
+        private CategorySerializerInterface $categorySerializer,
+        private int $maxAge,
+        private int $sharedMaxAge,
+        private int $cacheLifetime,
     ) {
-        $this->navigationMapper = $navigationMapper;
-        $this->serializer = $serializer;
-        $this->mediaSerializer = $mediaSerializer;
-        $this->navigationReferenceStore = $pageReferenceStore;
-        $this->maxAge = $maxAge;
-        $this->sharedMaxAge = $sharedMaxAge;
-        $this->cacheLifetime = $cacheLifetime;
     }
 
     public function getAction(Request $request, string $context): Response
     {
-        /** @var RequestAttributes $attributes */
-        $attributes = $request->attributes->get('_sulu');
+        $webspace = $this->requestAnalyzer->getWebspace();
+        if (null === $webspace) {
+            throw new \RuntimeException('No webspace found in request.');
+        }
 
-        /** @var Webspace $webspace */
-        $webspace = $attributes->getAttribute('webspace');
         $locale = $request->getLocale();
-
-        /** @var string $uuid */
         $uuid = $request->query->get('uuid');
-        $depth = (int) $this->getRequestParameter($request, 'depth', false, 1);
-        $flat = $this->getBooleanRequestParameter($request, 'flat', false, false);
-        $excerpt = $this->getBooleanRequestParameter($request, 'excerpt', false, false);
+        $depth = $request->query->getInt('depth', 1);
+        $flat = $request->query->getBoolean('flat');
+        $excerpt = $request->query->getBoolean('excerpt');
 
-        $navigation = $this->loadNavigation($webspace->getKey(), $locale, $depth, $flat, $context, $excerpt, $uuid);
+        /** @var Segment|null $segment */
+        $segment = $this->requestAnalyzer->getSegment();
+        $segmentKey = $segment?->getKey();
 
-        $this->navigationReferenceStore->add($context);
+        $navigation = $this->loadNavigation(
+            $webspace->getKey(),
+            $locale,
+            $segmentKey,
+            $depth,
+            $flat,
+            $context,
+            $this->getProperties($excerpt),
+            $uuid
+        );
 
-        // need to serialize the media entities inside the excerpt to keep the media serialization consistent
-        $navigation = $this->serializeExcerptMedia($navigation, $locale);
-
-        $response = new Response(
+        $transformedNavigation = $this->transformNavigationItems($navigation, $locale, $excerpt);
+        $response = JsonResponse::fromJsonString(
             $this->serializer->serialize(
-                new CollectionRepresentation($navigation, 'items'),
+                new CollectionRepresentation($transformedNavigation, 'items'),
                 'json',
                 (new SerializationContext())->setSerializeNull(true)
-            ),
-            200,
-            [
-                'Content-Type' => 'application/json',
-            ]
+            )
         );
 
         $response->setPublic();
@@ -122,73 +84,193 @@ class NavigationController
         $response->setSharedMaxAge($this->sharedMaxAge);
         $response->headers->set(SuluHttpCache::HEADER_REVERSE_PROXY_TTL, (string) $this->cacheLifetime);
 
+        $this->navigationReferenceStore->add($context, 'navigation');
+
         return $response;
     }
 
     /**
-     * @return mixed[]
+     * @param array<string, string> $properties
+     *
+     * @return array<int, array<string, mixed>>
      */
     protected function loadNavigation(
         string $webspaceKey,
         string $locale,
+        ?string $segmentKey,
         int $depth,
         bool $flat,
         string $context,
-        bool $excerpt,
-        ?string $uuid = null
+        array $properties,
+        ?string $uuid = null,
     ): array {
-        if ($uuid) {
-            return $this->navigationMapper->getNavigation(
+        return match (true) {
+            null !== $uuid && $flat => $this->navigationRepository->getNavigationFlatByUuid(
                 $uuid,
-                $webspaceKey,
                 $locale,
+                $webspaceKey,
                 $depth,
-                $flat,
                 $context,
-                $excerpt
-            );
-        }
+                $properties
+            ),
+            null !== $uuid => $this->navigationRepository->getNavigationTreeByUuid(
+                $uuid,
+                $locale,
+                $webspaceKey,
+                $depth,
+                $context,
+                $properties
+            ),
+            $flat => $this->navigationRepository->getNavigationFlat(
+                $context,
+                $locale,
+                $webspaceKey,
+                $segmentKey,
+                $depth,
+                $properties
+            ),
+            default => $this->navigationRepository->getNavigationTree(
+                $context,
+                $locale,
+                $webspaceKey,
+                $segmentKey,
+                $depth,
+                $properties
+            ),
+        };
+    }
 
-        return $this->navigationMapper->getRootNavigation(
-            $webspaceKey,
-            $locale,
-            $depth,
-            $flat,
-            $context,
-            $excerpt
+    /**
+     * @param array<int, array<string, mixed>> $items
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function transformNavigationItems(array $items, string $locale, bool $excerpt): array
+    {
+        return \array_map(
+            fn (array $item) => $this->transformNavigationItem($item, $locale, $excerpt),
+            $items
         );
     }
 
     /**
-     * @param mixed[] $navigation
+     * @param array<string, mixed> $item
      *
-     * @return mixed[]
+     * @return array<string, mixed>
      */
-    private function serializeExcerptMedia(array $navigation, string $locale): array
+    protected function transformNavigationItem(array $item, string $locale, bool $excerpt): array
     {
-        foreach ($navigation as $itemIndex => $navigationItem) {
-            if (isset($navigationItem['excerpt'])) {
-                foreach ($navigationItem['excerpt']['icon'] as $iconIndex => $iconMedia) {
-                    $navigation[$itemIndex]['excerpt']['icon'][$iconIndex] = $this->mediaSerializer->serialize(
-                        $iconMedia->getEntity(),
-                        $locale
-                    );
-                }
+        $transformed = [];
+        $transformed['id'] = $item['id'] ?? $item['uuid'] ?? null;
+        $transformed['uuid'] = $item['uuid'] ?? $item['id'] ?? null;
+        $transformed['linkType'] = $item['linkType'] ?? null;
+        $transformed['title'] = $item['title'] ?? '';
+        $transformed['url'] = $item['url'] ?? '';
+        $transformed['template'] = $item['template'] ?? 'default';
+        $transformed['locale'] = $item['locale'] ?? $locale;
+        $transformed['webspaceKey'] = $item['webspaceKey'] ?? null;
+        $transformed['order'] = $item['order'] ?? null;
+        $transformed['parent'] = $item['parent'] ?? null;
+        $transformed['published'] = $this->formatDate($item['published'] ?? null);
+        $transformed['publishedState'] = null !== ($item['publishedState'] ?? null);
+        $transformed['authored'] = $this->formatDate($item['authored'] ?? null);
+        $transformed['changed'] = $this->formatDate($item['changed'] ?? null);
+        $transformed['created'] = $this->formatDate($item['created'] ?? null);
+        $transformed['lastModified'] = $this->formatDate($item['lastModified'] ?? null);
+        $transformed['author'] = $item['author'] ?? null;
+        $transformed['changer'] = $item['changer'] ?? null;
+        $transformed['creator'] = $item['creator'] ?? null;
+        $transformed['urls'] = $item['urls'] ?? [$locale => $item['url'] ?? ''];
 
-                foreach ($navigationItem['excerpt']['images'] as $imageIndex => $imageMedia) {
-                    $navigation[$itemIndex]['excerpt']['images'][$imageIndex] = $this->mediaSerializer->serialize(
-                        $imageMedia->getEntity(),
-                        $locale
-                    );
-                }
-            }
-
-            // recursively serialize all excerpt medias
-            if (!empty($navigationItem['children'])) {
-                $navigation[$itemIndex]['children'] = $this->serializeExcerptMedia($navigationItem['children'], $locale);
-            }
+        if ($excerpt && isset($item['excerpt']) && \is_array($item['excerpt'])) {
+            $transformed['excerpt'] = $this->transformExcerpt($item['excerpt'], $locale);
         }
 
-        return $navigation;
+        /** @var array<int, array<string, mixed>> $children */
+        $children = $item['children'] ?? [];
+        $transformed['children'] = $this->transformNavigationItems($children, $locale, $excerpt);
+
+        return $transformed;
+    }
+
+    /**
+     * @param array<string, mixed> $excerptData
+     *
+     * @return array<string, mixed>
+     */
+    protected function transformExcerpt(array $excerptData, string $locale): array
+    {
+        $icon = $excerptData['icon'] ?? null;
+        $image = $excerptData['image'] ?? null;
+        $categories = $excerptData['categories'] ?? [];
+
+        return [
+            'title' => $excerptData['title'] ?? '',
+            'description' => $excerptData['description'] ?? '',
+            'more' => $excerptData['more'] ?? '',
+            'icon' => \is_object($icon) && \method_exists($icon, 'getEntity')
+                ? $this->mediaSerializer->serialize($icon->getEntity(), $locale)
+                : null,
+            'image' => \is_object($image) && \method_exists($image, 'getEntity')
+                ? $this->mediaSerializer->serialize($image->getEntity(), $locale)
+                : null,
+            'categories' => \is_array($categories) ? \array_map(
+                fn ($category) => $this->categorySerializer->serialize($category->getEntity(), $locale),
+                $categories
+            ) : [],
+            'tags' => $excerptData['tags'] ?? [],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function getProperties(bool $excerpt): array
+    {
+        $properties = [
+            'id' => 'object.resource.uuid',
+            'uuid' => 'object.resource.uuid',
+            'title' => 'title',
+            'url' => 'url',
+            'linkType' => 'object.linkData.provider',
+            'publishedState' => 'object.workflowPublished',
+            'published' => 'object.workflowPublished',
+            'author' => 'object.author.id',
+            'authored' => 'object.authored',
+            'changed' => 'object.resource.changed',
+            'changer' => 'object.resource.changer.id',
+            'created' => 'object.resource.created',
+            'creator' => 'object.resource.creator.id',
+            'lastModified' => 'object.lastModified',
+            'template' => 'object.templateKey',
+            'locale' => 'object.locale',
+            'webspaceKey' => 'object.resource.webspaceKey',
+            'order' => 'object.resource.lft',
+            'parent' => 'object.resource.parent.uuid',
+            'urls' => 'urls',
+        ];
+
+        if ($excerpt) {
+            $properties = \array_merge($properties, [
+                'excerpt.title' => 'excerpt.title',
+                'excerpt.description' => 'excerpt.description',
+                'excerpt.more' => 'excerpt.more',
+                'excerpt.icon' => 'excerpt.icon',
+                'excerpt.image' => 'excerpt.image',
+                'excerpt.categories' => 'excerpt.categories',
+                'excerpt.tags' => 'excerpt.tags',
+            ]);
+        }
+
+        return $properties;
+    }
+
+    protected function formatDate(mixed $date): ?string
+    {
+        if ($date instanceof \DateTimeInterface) {
+            return $date->format(\DateTimeInterface::ATOM);
+        }
+
+        return \is_string($date) ? $date : null;
     }
 }

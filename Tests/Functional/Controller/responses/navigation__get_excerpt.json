@@ -4,7 +4,7 @@
             {
                 "id": "@uuid@",
                 "uuid": "@uuid@",
-                "nodeType": 1,
+                "linkType": null,
                 "changed": "@string@.isDateTime()",
                 "changer": null,
                 "created": "@string@.isDateTime()",
@@ -15,8 +15,7 @@
                 "locale": "de",
                 "webspaceKey": "sulu_io",
                 "template": "default",
-                "parent": "@uuid@",
-                "path": "@string@.match(\"/test-1\").optional()",
+                "parent": "@null@||@uuid@",
                 "url": "\/test-1",
                 "urls": {
                     "de": "\/test-1"
@@ -24,24 +23,22 @@
                 "lastModified": null,
                 "author": null,
                 "authored": "@string@.isDateTime()",
-                "order": 20,
+                "order": "@integer@",
                 "excerpt": {
                     "title": "",
                     "more": "",
                     "description": "",
                     "categories": [],
-                    "audience_targeting_groups": [],
                     "tags": [],
-                    "segments": "@array@.isEmpty().optional()",
-                    "icon": [],
-                    "images": []
+                    "icon": null,
+                    "image": null
                 },
                 "children": []
             },
             {
                 "id": "@uuid@",
                 "uuid": "@uuid@",
-                "nodeType": 1,
+                "linkType": null,
                 "changed": "@string@.isDateTime()",
                 "changer": null,
                 "created": "@string@.isDateTime()",
@@ -52,8 +49,7 @@
                 "locale": "de",
                 "webspaceKey": "sulu_io",
                 "template": "default",
-                "parent": "@uuid@",
-                "path": "@string@.match(\"/test-2\").optional()",
+                "parent": "@null@||@uuid@",
                 "url": "\/test-2",
                 "urls": {
                     "de": "\/test-2"
@@ -61,53 +57,43 @@
                 "lastModified": null,
                 "author": null,
                 "authored": "@string@.isDateTime()",
-                "order": 30,
+                "order": "@integer@",
                 "excerpt": {
                     "title": "",
                     "more": "",
                     "description": "",
                     "categories": [],
-                    "audience_targeting_groups": [],
                     "tags": [],
-                    "segments": "@array@.isEmpty().optional()",
-                    "icon": [
-                        {
-                            "id": "@integer@",
-                            "locale": "de",
-                            "collection": "@integer@",
-                            "size": "@integer@",
-                            "mimeType": "image/png",
-                            "title": "Test Image",
-                            "description": "",
-                            "version": 1,
-                            "subVersion": 0,
-                            "name": "test-image.png",
-                            "type": {
-                                "name": "image",
-                                "id": 2
-                            },
-                            "isImage": true,
-                            "isVideo": false,
-                            "isAudio": false,
-                            "isDocument": false,
-                            "publishLanguages": [],
-                            "contentLanguages": [],
-                            "tags": [],
-                            "url": "@string@",
-                            "changed": "@string@.isDateTime()",
-                            "created": "@string@.isDateTime()",
-                            "properties": [],
-                            "categories": [],
-                            "targetGroups": [],
-                            "formatUri": "@string@.matchRegex('/^\\/uploads\\/media\\/{format}\\/\\d{2}\\/\\d+-test-image\\.{extension}\\?v=1-0$/')",
-                            "formatPreferredExtension": "png"
-                        }
-                    ],
-                    "images": []
+                    "icon": {
+                        "id": "@integer@",
+                        "locale": "de",
+                        "collection": "@integer@",
+                        "size": "@integer@",
+                        "mimeType": "image/png",
+                        "title": "Test Image",
+                        "description": "",
+                        "version": 1,
+                        "subVersion": 0,
+                        "name": "test-image.png",
+                        "type": "image",
+                        "isImage": true,
+                        "isVideo": false,
+                        "isAudio": false,
+                        "isDocument": false,
+                        "tags": [],
+                        "url": "@string@",
+                        "changed": "@string@.isDateTime()",
+                        "created": "@string@.isDateTime()",
+                        "properties": [],
+                        "categories": [],
+                        "targetGroups": [],
+                        "formatUri": "@string@.matchRegex('/^\\/uploads\\/media\\/{format}\\/\\d{2}\\/\\d+-test-image\\.{extension}\\?v=1-0$/')",
+                        "formatPreferredExtension": "png"
+                    },
+                    "image": null
                 },
                 "children": []
             }
         ]
     }
 }
-

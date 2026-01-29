@@ -13,444 +13,457 @@ declare(strict_types=1);
 
 namespace Sulu\Bundle\HeadlessBundle\Content;
 
-use Sulu\Bundle\DocumentManagerBundle\Bridge\DocumentInspector;
-use Sulu\Bundle\PageBundle\Document\BasePageDocument;
-use Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStoreNotExistsException;
-use Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStorePoolInterface;
-use Sulu\Component\Content\Compat\PropertyInterface;
-use Sulu\Component\Content\Compat\Structure\StructureBridge;
-use Sulu\Component\Content\Compat\StructureInterface;
-use Sulu\Component\Content\Compat\StructureManagerInterface;
-use Sulu\Component\Content\Document\Behavior\RedirectTypeBehavior;
-use Sulu\Component\Content\Document\Behavior\StructureBehavior;
-use Sulu\Component\Content\Document\Extension\ExtensionContainer;
-use Sulu\Component\Content\Document\RedirectType;
-use Sulu\Component\Content\Metadata\StructureMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FormMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\TypedFormMetadata;
+use Sulu\Bundle\AdminBundle\Metadata\MetadataProviderInterface;
+use Sulu\Bundle\HeadlessBundle\Content\ExtensionResolver\ExtensionResolverProvider;
+use Sulu\Bundle\HttpCacheBundle\ReferenceStore\ReferenceStoreInterface;
+use Sulu\Component\Persistence\Model\AuditableInterface;
+use Sulu\Content\Domain\Model\AuthorInterface;
+use Sulu\Content\Domain\Model\DimensionContentInterface;
+use Sulu\Content\Domain\Model\ExcerptInterface;
+use Sulu\Content\Domain\Model\LinkInterface;
+use Sulu\Content\Domain\Model\SeoInterface;
+use Sulu\Content\Domain\Model\ShadowInterface;
+use Sulu\Content\Domain\Model\TaxonomyInterface;
+use Sulu\Content\Domain\Model\TemplateInterface;
+use Sulu\Page\Domain\Model\PageInterface;
 
 class StructureResolver implements StructureResolverInterface
 {
-    /**
-     * @var ContentResolverInterface
-     */
-    private $contentResolver;
-
-    /**
-     * @var StructureManagerInterface
-     */
-    private $structureManager;
-
-    /**
-     * @var DocumentInspector
-     */
-    private $documentInspector;
-
-    /**
-     * @var ReferenceStorePoolInterface
-     */
-    private $referenceStorePool;
-
     public function __construct(
-        ContentResolverInterface $contentResolver,
-        StructureManagerInterface $structureManager,
-        DocumentInspector $documentInspector,
-        ReferenceStorePoolInterface $referenceStorePool
+        private MetadataProviderInterface $formMetadataProvider,
+        private ContentResolverInterface $contentResolver,
+        private ReferenceStoreInterface $referenceStore,
+        private ExtensionResolverProvider $extensionResolverProvider,
     ) {
-        $this->contentResolver = $contentResolver;
-        $this->structureManager = $structureManager;
-        $this->documentInspector = $documentInspector;
-        $this->referenceStorePool = $referenceStorePool;
     }
 
     /**
-     * @param StructureBridge $structure
+     * @param array<string, string>|null $properties
      */
     public function resolve(
-        StructureInterface $structure,
+        DimensionContentInterface $dimensionContent,
         string $locale,
-        bool $includeExtension = true
+        bool $includeExtension = true,
+        ?array $properties = null,
     ): array {
-        $requestedStructure = $structure;
-        $targetStructure = $this->getTargetStructure($requestedStructure);
+        $resource = $dimensionContent->getResource();
+        /** @var string $resourceId */
+        $resourceId = $resource->getId();
+        $resourceKey = $dimensionContent::getResourceKey();
 
-        $data = $this->getStructureData($targetStructure, $requestedStructure);
+        $this->referenceStore->add($resourceId, $resourceKey);
 
-        if ($includeExtension) {
-            $data['extension'] = $this->resolveExtensionData(
-                $this->getExtensionData($targetStructure),
-                $locale,
-                ['webspaceKey' => $targetStructure->getWebspaceKey()]
-            );
-        }
+        $attributes = $this->buildAttributes($dimensionContent);
 
-        foreach ($this->getProperties($targetStructure, $requestedStructure) as $property) {
-            $contentView = $this->contentResolver->resolve(
-                $property->getValue(),
-                $property,
-                $locale,
-                ['webspaceKey' => $property->getStructure()->getWebspaceKey()]
-            );
-
-            $data['content'][$property->getName()] = $contentView->getContent();
-            $data['view'][$property->getName()] = $contentView->getView();
-        }
-
-        return $data;
-    }
-
-    /**
-     * @param StructureBridge $structure
-     */
-    public function resolveProperties(
-        StructureInterface $structure,
-        array $propertyMap,
-        string $locale,
-        bool $includeExtension = false
-    ): array {
-        $requestedStructure = $structure;
-        $targetStructure = $this->getTargetStructure($requestedStructure);
-
-        $data = $this->getStructureData($targetStructure, $requestedStructure);
-
-        $unresolvedExtensionData = $this->getExtensionData($targetStructure);
-
-        $attributes = ['webspaceKey' => $targetStructure->getWebspaceKey()];
-        $excerptStructure = $this->structureManager->getStructure('excerpt');
-
-        if ($includeExtension) {
-            $data['extension'] = $this->resolveExtensionData($unresolvedExtensionData, $locale, $attributes);
-        }
-
-        foreach ($propertyMap as $targetProperty => $sourceProperty) {
-            if (!\is_string($targetProperty)) {
-                $targetProperty = $sourceProperty;
-            }
-
-            // the '.' is used to separate the extension name from the property name.
-            if (\str_contains($sourceProperty, '.')) {
-                [$extensionName, $propertyName] = \explode('.', $sourceProperty);
-
-                if (!isset($unresolvedExtensionData[$extensionName][$propertyName])) {
-                    continue;
-                }
-
-                $contentView = new ContentView($unresolvedExtensionData[$extensionName][$propertyName]);
-                if ('excerpt' === $extensionName) {
-                    $contentView = $this->resolveProperty(
-                        $excerptStructure,
-                        $propertyName,
-                        $locale,
-                        $attributes,
-                        $contentView->getContent()
-                    );
-                }
-            } else {
-                $property = $this->getProperty($sourceProperty, $targetStructure, $requestedStructure);
-
-                if (null === $property) {
-                    continue;
-                }
-
-                $contentView = $this->resolveProperty(
-                    $property->getStructure(),
-                    $sourceProperty,
-                    $locale,
-                    ['webspaceKey' => $property->getStructure()->getWebspaceKey()],
-                    $property->getValue()
-                );
-            }
-
-            $data['content'][$targetProperty] = $contentView->getContent();
-            $data['view'][$targetProperty] = $contentView->getView();
-        }
-
-        return $data;
-    }
-
-    /**
-     * @param StructureBridge $targetStructure
-     * @param StructureBridge $requestedStructure
-     */
-    private function getProperty(
-        string $name,
-        StructureInterface $targetStructure,
-        StructureInterface $requestedStructure
-    ): ?PropertyInterface {
-        if ('title' === $name && $requestedStructure->hasProperty('title')) {
-            return $requestedStructure->getProperty('title');
-        }
-
-        if ($targetStructure->hasProperty($name)) {
-            return $targetStructure->getProperty($name);
-        }
-
-        return null;
-    }
-
-    /**
-     * @param StructureBridge $targetStructure
-     * @param StructureBridge $requestedStructure
-     *
-     * @return array<string, PropertyInterface>
-     */
-    private function getProperties(StructureInterface $targetStructure, StructureInterface $requestedStructure): array
-    {
-        $properties = [];
-
-        foreach ($targetStructure->getProperties(true) as $property) {
-            $property = $this->getProperty(
-                $property->getName(),
-                $targetStructure,
-                $requestedStructure
-            );
-
-            if (null !== $property) {
-                $properties[$property->getName()] = $property;
-            }
-        }
-
-        return $properties;
-    }
-
-    /**
-     * @param StructureBridge $targetStructure
-     * @param StructureBridge $requestedStructure
-     *
-     * @return mixed[]
-     */
-    private function getStructureData(
-        StructureInterface $targetStructure,
-        StructureInterface $requestedStructure
-    ): array {
-        $targetDocument = $targetStructure->getDocument();
-        $requestedDocument = $requestedStructure->getDocument();
-
-        /** @var string|null $templateKey */
-        $templateKey = null;
-        if (\method_exists($targetDocument, 'getStructureType')) {
-            $templateKey = $targetDocument->getStructureType();
-        }
-
-        /** @var int|null $author */
-        $author = null;
-        if (\method_exists($targetDocument, 'getAuthor')) {
-            $author = $targetDocument->getAuthor();
-        }
-
-        /** @var \DateTimeInterface|null $authored */
-        $authored = null;
-        if (\method_exists($targetDocument, 'getAuthored')) {
-            /** @var \DateTimeInterface|null $authored typehint in sulu is wrong */
-            $authored = $targetDocument->getAuthored();
-        }
-
-        /** @var int|null $changer */
-        $changer = null;
-        if (\method_exists($requestedDocument, 'getChanger')) {
-            $changer = $requestedDocument->getChanger();
-        }
-
-        /** @var \DateTimeInterface|null $changed */
-        $changed = null;
-        if (\method_exists($requestedDocument, 'getChanged')) {
-            $changed = $requestedDocument->getChanged();
-        }
-
-        /** @var int|null $creator */
-        $creator = null;
-        if (\method_exists($requestedDocument, 'getCreator')) {
-            $creator = $requestedDocument->getCreator();
-        }
-
-        /** @var \DateTimeInterface|null $created */
-        $created = null;
-        if (\method_exists($requestedDocument, 'getCreated')) {
-            $created = $requestedDocument->getCreated();
-        }
-
-        $templateType = $this->getTemplateType($targetStructure, $targetDocument);
-
-        $this->addToReferenceStore($targetStructure->getUuid(), $templateType);
-        $this->addToReferenceStore(
-            $requestedStructure->getUuid(),
-            $this->getTemplateType($requestedStructure, $requestedDocument)
-        );
-
-        return [
-            'id' => $requestedStructure->getUuid(),
-            'nodeType' => $requestedStructure->getNodeType(),
-            'type' => $templateType,
-            'template' => $templateKey,
-            'content' => [],
-            'view' => [],
-            'author' => $author,
-            'authored' => $authored ? $authored->format(\DateTimeImmutable::ISO8601) : null,
-            'changer' => $changer,
-            'changed' => $changed ? $changed->format(\DateTimeImmutable::ISO8601) : null,
-            'creator' => $creator,
-            'created' => $created ? $created->format(\DateTimeImmutable::ISO8601) : null,
+        $data = [
+            'id' => $resourceId,
+            'type' => $dimensionContent instanceof TemplateInterface ? $dimensionContent::getTemplateType() : null,
         ];
-    }
 
-    /**
-     * @param StructureBridge $structure
-     *
-     * @return mixed[]
-     */
-    private function getExtensionData(StructureInterface $structure): array
-    {
-        /** @var BasePageDocument $document */
-        $document = $structure->getDocument();
-
-        /** @var ExtensionContainer|mixed[] $extensionData */
-        $extensionData = [];
-        if (\method_exists($document, 'getExtensionsData')) {
-            $extensionData = $document->getExtensionsData();
+        if ($dimensionContent instanceof LinkInterface) {
+            $linkData = $dimensionContent->getLinkData();
+            $data['linkType'] = null !== $linkData ? ($linkData['provider'] ?? null) : null;
         }
 
-        if ($extensionData instanceof ExtensionContainer) {
-            $extensionData = $extensionData->toArray();
+        if ($dimensionContent instanceof TemplateInterface) {
+            $templateKey = $dimensionContent->getTemplateKey();
+            $data['template'] = $templateKey;
+
+            $data['content'] = [];
+            $data['view'] = [];
+            if (null !== $templateKey) {
+                $contentView = $this->resolveTemplateContent(
+                    $dimensionContent,
+                    $templateKey,
+                    $locale,
+                    $attributes,
+                    $properties,
+                );
+
+                $data['content'] = $contentView->getContent();
+                $data['view'] = $contentView->getView();
+            }
         }
 
-        return $extensionData;
-    }
-
-    /**
-     * @param mixed[] $data
-     * @param mixed[] $attributes
-     *
-     * @return mixed[]
-     */
-    private function resolveExtensionData(array $data, string $locale, array $attributes): array
-    {
-        $excerptStructure = $this->structureManager->getStructure('excerpt');
-
-        $unresolvedExcerptData = $data['excerpt'] ?? [];
-
-        $resolvedExcerptData = [];
-        foreach ($excerptStructure->getProperties(true) as $property) {
-            $resolvedExcerptData[$property->getName()] = $this->resolveProperty(
-                $excerptStructure,
-                $property->getName(),
+        if ($includeExtension) {
+            $data['extension'] = $this->resolveExtensions(
+                $dimensionContent,
                 $locale,
                 $attributes,
-                $unresolvedExcerptData[$property->getName()] ?? null
-            )->getContent();
+                $properties
+            );
         }
 
-        $data['excerpt'] = $resolvedExcerptData;
+        if ($dimensionContent instanceof AuthorInterface) {
+            $author = $dimensionContent->getAuthor();
+            $authored = $dimensionContent->getAuthored();
+
+            $data['author'] = $author?->getId();
+            $data['authored'] = $authored?->format(\DateTimeImmutable::ATOM);
+        }
+
+        if ($resource instanceof AuditableInterface) {
+            $data['changer'] = $resource->getChanger()?->getId();
+            $data['changed'] = $resource->getChanged()->format(\DateTimeImmutable::ATOM);
+            $data['creator'] = $resource->getCreator()?->getId();
+            $data['created'] = $resource->getCreated()->format(\DateTimeImmutable::ATOM);
+        }
 
         return $data;
     }
 
     /**
-     * @param mixed $value
-     * @param mixed[] $attributes
+     * @param array<string, string> $propertyMap
      */
-    private function resolveProperty(
-        StructureInterface $structure,
-        string $name,
+    public function resolveProperties(
+        DimensionContentInterface $dimensionContent,
+        array $propertyMap,
+        string $locale,
+        bool $includeExtension = false,
+    ): array {
+        return $this->resolve($dimensionContent, $locale, $includeExtension, $propertyMap);
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @param array<string, string>|null $properties
+     */
+    private function resolveTemplateContent(
+        TemplateInterface $dimensionContent,
+        string $templateKey,
         string $locale,
         array $attributes,
-        $value
+        ?array $properties = null,
     ): ContentView {
-        $property = $structure->getProperty($name);
-        $property->setValue($value);
+        /** @var TypedFormMetadata $typedFormMetadata */
+        $typedFormMetadata = $this->formMetadataProvider->getMetadata($dimensionContent::getTemplateType(), $locale, []);
+        $formMetadata = $typedFormMetadata->getForms()[$templateKey] ?? null;
 
-        return $this->contentResolver->resolve(
-            $value,
-            $property,
+        $content = [];
+        $view = [];
+        if (!$formMetadata) {
+            return new ContentView($content, $view);
+        }
+
+        $fieldMetadataList = $formMetadata->getFlatFieldMetadata();
+        $templateData = $dimensionContent->getTemplateData();
+
+        if (null !== $properties) {
+            $filteredFieldMetadata = [];
+            $filteredTemplateData = [];
+            foreach ($properties as $targetKey => $sourceKey) {
+                $isExtensionProperty = false;
+                foreach ($this->extensionResolverProvider->getResolvers() as $resolver) {
+                    if (\str_starts_with($sourceKey, $resolver->getPrefix())) {
+                        $isExtensionProperty = true;
+                        break;
+                    }
+                }
+
+                if ($isExtensionProperty) {
+                    continue;
+                }
+
+                if (\array_key_exists($sourceKey, $fieldMetadataList)) {
+                    $filteredFieldMetadata[$targetKey] = $fieldMetadataList[$sourceKey];
+                }
+                if (\array_key_exists($sourceKey, $templateData)) {
+                    $filteredTemplateData[$targetKey] = $templateData[$sourceKey];
+                }
+            }
+            $fieldMetadataList = $filteredFieldMetadata;
+            $templateData = $filteredTemplateData;
+
+            if ($dimensionContent instanceof DimensionContentInterface) {
+                $this->resolveExtensionProperties($dimensionContent, $properties, $locale, $attributes, $content, $view);
+            }
+        }
+
+        foreach ($fieldMetadataList as $fieldName => $fieldMetadata) {
+            $value = $templateData[$fieldName] ?? null;
+            $contentView = $this->contentResolver->resolve($value, $fieldMetadata, $locale, $attributes);
+            $content[$fieldName] = $contentView->getContent();
+            $view[$fieldName] = $contentView->getView();
+        }
+
+        return new ContentView($content, $view);
+    }
+
+    /**
+     * @param array<string, string> $properties
+     * @param array<string, mixed> $attributes
+     * @param array<string, mixed> $content
+     * @param array<string, mixed> $view
+     */
+    private function resolveExtensionProperties(
+        DimensionContentInterface $dimensionContent,
+        array $properties,
+        string $locale,
+        array $attributes,
+        array &$content,
+        array &$view,
+    ): void {
+        foreach ($this->extensionResolverProvider->getResolvers() as $resolver) {
+            if ($this->extensionResolverProvider->hasPropertiesWithPrefix($properties, $resolver->getPrefix())) {
+                $extensionView = $resolver->resolve($dimensionContent, $properties, $locale, $attributes);
+                $extensionContent = $extensionView->getContent();
+                \assert(\is_array($extensionContent));
+                $content = \array_merge($content, $extensionContent);
+                $view = \array_merge($view, $extensionView->getView());
+            }
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildAttributes(DimensionContentInterface $dimensionContent): array
+    {
+        $resource = $dimensionContent->getResource();
+
+        $attributes = [
+            'uuid' => $resource->getId(),
+        ];
+
+        if ($resource instanceof PageInterface) {
+            $attributes['webspaceKey'] = $resource->getWebspaceKey();
+        }
+
+        $attributes['isShadow'] = false;
+        $attributes['shadowLocale'] = null;
+        if ($dimensionContent instanceof ShadowInterface) {
+            $shadowLocale = $dimensionContent->getShadowLocale();
+            $attributes['isShadow'] = null !== $shadowLocale;
+            $attributes['shadowLocale'] = $shadowLocale;
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @param array<string, string>|null $properties
+     *
+     * @return array<string, mixed>
+     */
+    private function resolveExtensions(
+        DimensionContentInterface $dimensionContent,
+        string $locale,
+        array $attributes,
+        ?array $properties = null,
+    ): array {
+        $extensions = [];
+
+        $excerptData = [];
+
+        if ($dimensionContent instanceof ExcerptInterface) {
+            $excerptData = $this->resolveExcerptData(
+                $dimensionContent,
+                $locale,
+                $attributes,
+                $properties,
+            );
+        }
+
+        if ($dimensionContent instanceof TaxonomyInterface) {
+            $excerptData = \array_merge(
+                $excerptData,
+                $this->resolveTaxonomyData($dimensionContent, $properties)
+            );
+        }
+
+        if ([] !== $excerptData) {
+            $extensions['excerpt'] = $excerptData;
+        }
+
+        if ($dimensionContent instanceof SeoInterface) {
+            $extensions['seo'] = $this->resolveSeoData(
+                $dimensionContent,
+                $locale,
+                $attributes,
+                $properties,
+            );
+        }
+
+        return $extensions;
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     * @param array<string, string>|null $properties
+     *
+     * @return array<string, mixed>
+     */
+    private function resolveExcerptData(
+        ExcerptInterface $dimensionContent,
+        string $locale,
+        array $attributes,
+        ?array $properties = null,
+    ): array {
+        $data = $dimensionContent->getExcerptData();
+
+        $formMetadata = $this->formMetadataProvider->getMetadata(
+            'content_excerpt',
             $locale,
-            $attributes
+            ['instanceOf' => ExcerptInterface::class]
         );
-    }
 
-    private function addToReferenceStore(string $uuid, string $alias): void
-    {
-        if ('page' === $alias) {
-            // unfortunately the reference store for pages was not adjusted and still uses content as alias
-            $alias = 'content';
+        if (!$formMetadata instanceof FormMetadata) {
+            return $data;
         }
 
-        try {
-            $referenceStore = $this->referenceStorePool->getStore($alias);
-        } catch (ReferenceStoreNotExistsException $e) {
-            // @ignoreException do nothing when reference store was not found
-
-            return;
-        }
-
-        $referenceStore->add($uuid);
-    }
-
-    private function getTemplateType(StructureInterface $structure, object $document): string
-    {
-        $structureContent = null;
-
-        if (\method_exists($structure, 'getContent')) {
-            $structureContent = $structure->getContent();
-        }
-
-        if (\is_object($structureContent) && \method_exists($structureContent, 'getTemplateType')) {
-            // determine type for structure that is implemented based on the SuluContentBundle
-            return $structureContent->getTemplateType();
-        }
-
-        if ($document instanceof StructureBehavior) {
-            // determine type for structure that is implemented in the SuluPageBundle or the SuluArticleBundle
-            $templateType = $this->documentInspector->getMetadata($document)->getAlias();
-
-            if ('home' === $templateType) {
-                return 'page';
-            }
-
-            return $templateType;
-        }
-
-        return 'unknown';
+        return $this->resolveFormFields($formMetadata, $data, $locale, $attributes, $properties, 'excerpt/');
     }
 
     /**
-     * @param StructureBridge $structure
+     * @param array<string, string>|null $properties
      *
-     * @return StructureBridge
+     * @return array<string, mixed>
      */
-    private function getTargetStructure(StructureInterface $structure): StructureInterface
-    {
-        $document = $structure->getDocument();
-        if (!$document instanceof RedirectTypeBehavior) {
-            return $structure;
-        }
+    private function resolveTaxonomyData(
+        TaxonomyInterface $dimensionContent,
+        ?array $properties = null,
+    ): array {
+        $data = [
+            'categories' => $dimensionContent->getExcerptCategoryIds(),
+            'tags' => $dimensionContent->getExcerptTagNames(),
+            'audience_targeting_groups' => $dimensionContent->getExcerptAudienceTargetGroupIds(),
+            'segments' => $dimensionContent->getExcerptSegment() ?? [],
+        ];
 
-        while ($document instanceof RedirectTypeBehavior && RedirectType::INTERNAL === $document->getRedirectType()) {
-            $redirectTargetDocument = $document->getRedirectTarget();
-
-            if ($redirectTargetDocument instanceof StructureBehavior) {
-                $document = $redirectTargetDocument;
+        if (null !== $properties) {
+            $filteredData = [];
+            foreach ($properties as $targetKey => $sourceKey) {
+                if (\array_key_exists($sourceKey, $data)) {
+                    $filteredData[$targetKey] = $data[$sourceKey];
+                }
             }
+
+            return $filteredData;
         }
 
-        if ($document !== $structure->getDocument() && $document instanceof StructureBehavior) {
-            return $this->documentToStructure($document);
-        }
-
-        return $structure;
+        return $data;
     }
 
     /**
-     * @see PageRouteDefaultsProvider::documentToStructure()
+     * @param array<string, mixed> $attributes
+     * @param array<string, string>|null $properties
      *
-     * @return StructureBridge
+     * @return array<string, mixed>
      */
-    private function documentToStructure(StructureBehavior $document): StructureInterface
+    private function resolveSeoData(
+        SeoInterface $dimensionContent,
+        string $locale,
+        array $attributes,
+        ?array $properties = null,
+    ): array {
+        $booleanFields = [
+            'noIndex' => $dimensionContent->getSeoNoIndex(),
+            'noFollow' => $dimensionContent->getSeoNoFollow(),
+            'hideInSitemap' => $dimensionContent->getSeoHideInSitemap(),
+        ];
+
+        $formMetadata = $this->formMetadataProvider->getMetadata(
+            'content_seo',
+            $locale,
+            ['instanceOf' => SeoInterface::class]
+        );
+
+        if (!$formMetadata instanceof FormMetadata) {
+            return \array_merge($booleanFields, $dimensionContent->getSeoData());
+        }
+
+        $resolved = $this->resolveFormFields($formMetadata, $dimensionContent->getSeoData(), $locale, $attributes, $properties, 'seo/');
+
+        return \array_merge($resolved, $booleanFields);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, mixed> $attributes
+     * @param array<string, string>|null $properties
+     *
+     * @return array<string, mixed>
+     */
+    private function resolveFormFields(
+        FormMetadata $formMetadata,
+        array $data,
+        string $locale,
+        array $attributes,
+        ?array $properties = null,
+        ?string $stripPrefix = null,
+    ): array {
+        $fieldMetadataList = $formMetadata->getFlatFieldMetadata();
+        $resolved = [];
+
+        $displayOnlyTypes = ['search_result'];
+
+        $fieldsToResolve = [];
+        if (null !== $properties) {
+            foreach ($properties as $targetKey => $sourceKey) {
+                if (\array_key_exists($sourceKey, $fieldMetadataList)) {
+                    $fieldsToResolve[$targetKey] = [
+                        'metadata' => $fieldMetadataList[$sourceKey],
+                        'dataKey' => $sourceKey,
+                    ];
+                }
+            }
+        } else {
+            foreach ($fieldMetadataList as $fieldName => $fieldMetadata) {
+                $outputKey = $fieldName;
+                if (null !== $stripPrefix) {
+                    if (!\str_starts_with($fieldName, $stripPrefix)) {
+                        continue;
+                    }
+                    $outputKey = \substr($fieldName, \strlen($stripPrefix));
+                }
+                $fieldsToResolve[$outputKey] = [
+                    'metadata' => $fieldMetadata,
+                    'dataKey' => $outputKey,
+                ];
+            }
+        }
+
+        foreach ($fieldsToResolve as $outputKey => $fieldInfo) {
+            $fieldMetadata = $fieldInfo['metadata'];
+            $dataKey = $fieldInfo['dataKey'];
+
+            if (\in_array($fieldMetadata->getType(), $displayOnlyTypes, true)) {
+                continue;
+            }
+
+            $value = $data[$dataKey] ?? null;
+            $contentView = $this->contentResolver->resolve($value, $fieldMetadata, $locale, $attributes);
+            $content = $contentView->getContent();
+
+            if (null === $content) {
+                $content = $this->getEmptyValue($fieldMetadata->getType());
+            }
+
+            $resolved[$outputKey] = $content;
+        }
+
+        return $resolved;
+    }
+
+    private function getEmptyValue(string $fieldType): mixed
     {
-        /** @var StructureMetadata $structure */
-        $structure = $this->documentInspector->getStructureMetadata($document);
-        $documentAlias = $this->documentInspector->getMetadata($document)->getAlias();
+        $arrayTypes = [
+            'single_media_selection',
+            'media_selection',
+            'category_selection',
+            'tag_selection',
+            'snippet_selection',
+            'page_selection',
+            'segment_select',
+        ];
 
-        /** @var StructureBridge $structureBridge */
-        $structureBridge = $this->structureManager->wrapStructure($documentAlias, $structure);
-        $structureBridge->setDocument($document);
+        if (\in_array($fieldType, $arrayTypes, true)) {
+            return [];
+        }
 
-        return $structureBridge;
+        return '';
     }
 }

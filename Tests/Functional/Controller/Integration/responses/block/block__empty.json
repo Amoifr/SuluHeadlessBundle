@@ -1,6 +1,6 @@
 {
     "id": "@uuid@",
-    "nodeType": 1,
+    "linkType": null,
     "type": "page",
     "template": "resolver-test",
     "content": {
@@ -26,7 +26,9 @@
         "snippet_selection": [],
         "single_snippet_selection": null,
         "teaser_selection": [],
-        "smart_content": []
+        "smart_content": [],
+        "article_selection": [],
+        "single_article_selection": "@null@"
     },
     "view": {
         "title": [],
@@ -94,7 +96,15 @@
             "websiteCategoriesOperator": "OR",
             "websiteTags": [],
             "websiteTagsOperator": "OR",
-            "excluded": ["@uuid@"]
+            "excluded": [
+                "@uuid@"
+            ]
+        },
+        "article_selection": {
+            "ids": []
+        },
+        "single_article_selection": {
+            "id": ""
         }
     },
     "author": null,
@@ -111,7 +121,7 @@
             "categories": [],
             "tags": [],
             "icon": [],
-            "images": [],
+            "image": [],
             "audience_targeting_groups": [],
             "segments": []
         },

@@ -13,8 +13,8 @@ declare(strict_types=1);
 
 namespace Sulu\Bundle\HeadlessBundle\Content\ContentTypeResolver;
 
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
 use Sulu\Bundle\HeadlessBundle\Content\ContentView;
-use Sulu\Component\Content\Compat\PropertyInterface;
 
 class SinglePageSelectionResolver implements ContentTypeResolverInterface
 {
@@ -23,24 +23,20 @@ class SinglePageSelectionResolver implements ContentTypeResolverInterface
         return 'single_page_selection';
     }
 
-    /**
-     * @var ContentTypeResolverInterface
-     */
-    private $pageSelectionResolver;
-
-    public function __construct(ContentTypeResolverInterface $pageSelectionResolver)
-    {
-        $this->pageSelectionResolver = $pageSelectionResolver;
+    public function __construct(
+        private ContentTypeResolverInterface $pageSelectionResolver,
+    ) {
     }
 
-    public function resolve($data, PropertyInterface $property, string $locale, array $attributes = []): ContentView
+    public function resolve(mixed $data, FieldMetadata $fieldMetadata, string $locale, array $attributes = []): ContentView
     {
-        if (!\is_string($data)) {
-            return new ContentView(null, ['id' => null]);
+        if (!\is_string($data) || '' === $data) {
+            return new ContentView(null, ['id' => '']);
         }
 
-        $content = $this->pageSelectionResolver->resolve([$data], $property, $locale, $attributes);
+        $content = $this->pageSelectionResolver->resolve([$data], $fieldMetadata, $locale, $attributes);
+        $resolvedContent = $content->getContent();
 
-        return new ContentView($content->getContent()[0] ?? null, ['id' => $data]);
+        return new ContentView(\is_array($resolvedContent) ? ($resolvedContent[0] ?? null) : null, ['id' => $data]);
     }
 }

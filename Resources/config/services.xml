@@ -3,14 +3,30 @@
            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
            xsi:schemaLocation="http://symfony.com/schema/dic/services http://symfony.com/schema/dic/services/services-1.0.xsd">
     <services>
+        <!-- Extension Resolvers -->
         <service
-            id="sulu_headless.content_resolver.page_selection_container_factory"
-            class="Sulu\Bundle\HeadlessBundle\Content\ContentTypeResolver\PageSelectionContainerFactory"
+            id="sulu_headless.excerpt_resolver"
+            class="Sulu\Bundle\HeadlessBundle\Content\ExtensionResolver\ExcerptResolver"
         >
-            <argument type="service" id="sulu.content.query_executor"/>
-            <argument type="service" id="sulu_page.smart_content.data_provider.content.query_builder"/>
-            <argument>%sulu.context%</argument>
-            <argument type="expression">container.hasParameter('sulu.preview') ? parameter('sulu.preview') : false</argument>
+            <argument type="service" id="sulu_admin.form_metadata_provider"/>
+            <argument type="service" id="sulu_headless.content_resolver"/>
+            <tag name="sulu_headless.extension_resolver"/>
+        </service>
+
+        <service
+            id="sulu_headless.seo_resolver"
+            class="Sulu\Bundle\HeadlessBundle\Content\ExtensionResolver\SeoResolver"
+        >
+            <argument type="service" id="sulu_admin.form_metadata_provider"/>
+            <argument type="service" id="sulu_headless.content_resolver"/>
+            <tag name="sulu_headless.extension_resolver"/>
+        </service>
+
+        <service
+            id="sulu_headless.extension_resolver_provider"
+            class="Sulu\Bundle\HeadlessBundle\Content\ExtensionResolver\ExtensionResolverProvider"
+        >
+            <argument type="tagged_iterator" tag="sulu_headless.extension_resolver"/>
         </service>
 
         <service
@@ -18,10 +34,10 @@
             class="Sulu\Bundle\HeadlessBundle\Content\StructureResolver"
             public="true"
         >
+            <argument type="service" id="sulu_admin.form_metadata_provider"/>
             <argument type="service" id="sulu_headless.content_resolver"/>
-            <argument type="service" id="sulu.content.structure_manager"/>
-            <argument type="service" id="sulu_document_manager.document_inspector"/>
-            <argument type="service" id="sulu_website.reference_store_pool"/>
+            <argument type="service" id="sulu_http_cache.reference_store"/>
+            <argument type="service" id="sulu_headless.extension_resolver_provider"/>
         </service>
         <service id="Sulu\Bundle\HeadlessBundle\Content\StructureResolverInterface" alias="sulu_headless.structure_resolver"/>
 
@@ -32,12 +48,5 @@
         >
             <argument type="tagged" tag="sulu_headless.content_type_resolver" default-index-method="getContentType" index-by="type"/>
         </service>
-        <service id="Sulu\Bundle\HeadlessBundle\Content\ContentResolverInterface" alias="sulu_headless.content_resolver"/>
-
-        <service id="sulu_headless.reference_store.navigation"
-                 class="Sulu\Bundle\WebsiteBundle\ReferenceStore\ReferenceStore">
-            <tag name="sulu_website.reference_store" alias="navigation"/>
-            <tag name="kernel.reset" method="reset"/>
-        </service>
-    </services>
+        <service id="Sulu\Bundle\HeadlessBundle\Content\ContentResolverInterface" alias="sulu_headless.content_resolver"/>    </services>
 </container>

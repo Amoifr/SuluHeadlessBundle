@@ -1,6 +1,6 @@
 {
     "id": "@uuid@",
-    "nodeType": 1,
+    "linkType": null,
     "type": "page",
     "template": "resolver-test",
     "content": {
@@ -11,7 +11,7 @@
                 "type": "text",
                 "title": "First Block",
                 "content": "<p>First block content</p>",
-                "settings": {}
+                "settings": []
             },
             {
                 "type": "media",
@@ -37,25 +37,20 @@
                         "categories": [],
                         "tags": [],
                         "targetGroups": [],
-                        "contentLanguages": [],
-                        "publishLanguages": [],
                         "properties": [],
-                        "type": {
-                            "id": 2,
-                            "name": "image"
-                        },
+                        "type": "image",
                         "created": "@string@.isDateTime()",
                         "changed": "@string@.isDateTime()"
                     }
                 ],
                 "caption": "Media block caption",
-                "settings": {}
+                "settings": []
             },
             {
                 "type": "text",
                 "title": "Third Block",
                 "content": "<p>Third block content</p>",
-                "settings": {}
+                "settings": []
             }
         ],
         "text_editor": "",
@@ -77,7 +72,9 @@
         "snippet_selection": [],
         "single_snippet_selection": null,
         "teaser_selection": [],
-        "smart_content": []
+        "smart_content": [],
+        "article_selection": [],
+        "single_article_selection": "@null@"
     },
     "view": {
         "title": [],
@@ -89,7 +86,9 @@
             },
             {
                 "images": {
-                    "ids": ["@integer@"]
+                    "ids": [
+                        "@integer@"
+                    ]
                 },
                 "caption": []
             },
@@ -160,7 +159,15 @@
             "websiteCategoriesOperator": "OR",
             "websiteTags": [],
             "websiteTagsOperator": "OR",
-            "excluded": ["@uuid@"]
+            "excluded": [
+                "@uuid@"
+            ]
+        },
+        "article_selection": {
+            "ids": []
+        },
+        "single_article_selection": {
+            "id": ""
         }
     },
     "author": null,
@@ -177,7 +184,7 @@
             "categories": [],
             "tags": [],
             "icon": [],
-            "images": [],
+            "image": [],
             "audience_targeting_groups": [],
             "segments": []
         },

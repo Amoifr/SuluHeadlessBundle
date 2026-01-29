@@ -13,28 +13,28 @@ declare(strict_types=1);
 
 namespace Sulu\Bundle\HeadlessBundle\Content;
 
-use Sulu\Component\Content\Compat\StructureInterface;
+use Sulu\Content\Domain\Model\DimensionContentInterface;
 
 interface StructureResolverInterface
 {
     /**
-     * @return mixed[]
+     * @return array<string, mixed>
      */
     public function resolve(
-        StructureInterface $structure,
+        DimensionContentInterface $dimensionContent,
         string $locale,
-        bool $includeExtension = true
+        bool $includeExtension = true,
     ): array;
 
     /**
-     * @param string[] $propertyMap
+     * @param array<string, string> $propertyMap
      *
-     * @return mixed[]
+     * @return array<string, mixed>
      */
     public function resolveProperties(
-        StructureInterface $structure,
+        DimensionContentInterface $dimensionContent,
         array $propertyMap,
         string $locale,
-        bool $includeExtension = false
+        bool $includeExtension = false,
     ): array;
 }

@@ -13,8 +13,10 @@ declare(strict_types=1);
 
 namespace Sulu\Bundle\HeadlessBundle\Tests\Functional\Controller;
 
+use CmsIg\Seal\EngineInterface;
 use Sulu\Bundle\HeadlessBundle\Tests\Functional\BaseTestCase;
 use Sulu\Bundle\HeadlessBundle\Tests\Traits\CreateCategoryTrait;
+use Sulu\Bundle\HeadlessBundle\Tests\Traits\CreateMediaTrait;
 use Sulu\Bundle\HeadlessBundle\Tests\Traits\CreatePageTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,26 +24,31 @@ use Symfony\Component\HttpFoundation\Response;
 class SearchControllerTest extends BaseTestCase
 {
     use CreateCategoryTrait;
+    use CreateMediaTrait;
     use CreatePageTrait;
 
-    /**
-     * @var KernelBrowser
-     */
-    private $websiteClient;
+    private KernelBrowser $websiteClient;
 
     private static ?int $category1Id = null;
     private static ?int $category2Id = null;
 
     public static function setUpBeforeClass(): void
     {
-        self::purgeDatabase();
-        self::initPhpcr();
+        static::purgeDatabase();
+        self::bootKernel();
 
-        $searchManager = self::getContainer()->get('massive_search.search_manager');
-        foreach ($searchManager->getIndexNames() as $indexName) {
-            $searchManager->purge($indexName);
-        }
-        $searchManager->flush();
+        $collection = self::createCollection('Test Collection', 'de');
+        $media = self::createMedia('Test Image', $collection, 'de');
+        self::getEntityManager()->flush();
+
+        /** @var EngineInterface $engine */
+        $engine = self::getContainer()->get(EngineInterface::class);
+
+        // Drop and recreate schema to ensure fresh indexes
+        $task = $engine->dropSchema(['return_slow_promise_result' => true]);
+        $task->wait();
+        $task = $engine->createSchema(['return_slow_promise_result' => true]);
+        $task->wait();
 
         $entityManager = self::getEntityManager();
         $connection = $entityManager->getConnection();
@@ -69,15 +76,23 @@ class SearchControllerTest extends BaseTestCase
             [
                 'title' => 'Sulu is awesome',
                 'url' => '/awesome-sulu',
+                'excerpt' => [
+                    'image' => [
+                        'id' => $media->getId(),
+                    ],
+                ],
             ]
         );
 
         self::createPage(
             [
-                'title' => 'MASSIVE ART is awesome',
-                'url' => '/awesome-massive-art',
+                'title' => 'SEAL is awesome',
+                'url' => '/awesome-seal',
             ]
         );
+
+        // Clear entity manager to ensure fresh state for routing
+        self::getEntityManager()->clear();
 
         self::createPage([
             'title' => 'Content Management Systems',
@@ -124,44 +139,42 @@ class SearchControllerTest extends BaseTestCase
     public static function provideAttributes(): \Generator
     {
         yield [
-            'massive',
-            ['page_sulu_io_published'],
-            'search__get_massive.json',
+            'SEAL',
+            'website',
+            'search__get_seal.json',
         ];
 
         yield [
             'awesome',
-            ['page_sulu_io_published'],
+            'website',
             'search__get_awesome.json',
         ];
 
         yield 'page with categories' => [
-            'Content Management',
-            ['page_sulu_io_published'],
+            'CMS Guide',
+            'website',
             'search__get_content_management.json',
         ];
 
         yield 'page with tags' => [
-            'Web Development',
-            ['page_sulu_io_published'],
+            'Development Resources',
+            'website',
             'search__get_web_development.json',
         ];
 
         yield 'page with categories and tags' => [
-            'PHP CMS',
-            ['page_sulu_io_published'],
+            'Complete Tutorial',
+            'website',
             'search__get_php_cms.json',
         ];
     }
 
     /**
-     * @param string[] $indices
-     *
      * @dataProvider provideAttributes
      */
-    public function testGetAction(string $query, array $indices, string $expectedPatternFile): void
+    public function testGetAction(string $query, string $index, string $expectedPatternFile): void
     {
-        $this->websiteClient->request('GET', '/api/search?q=' . $query . '&indices=' . \implode(',', $indices));
+        $this->websiteClient->request('GET', '/api/search?q=' . $query . '&index=' . $index);
 
         $response = $this->websiteClient->getResponse();
         $this->assertInstanceOf(Response::class, $response);

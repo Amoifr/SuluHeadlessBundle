@@ -16,12 +16,14 @@ namespace Sulu\Bundle\HeadlessBundle\Tests\Unit\Content\ContentTypeResolver;
 use PHPUnit\Framework\TestCase;
 use Prophecy\PhpUnit\ProphecyTrait;
 use Prophecy\Prophecy\ObjectProphecy;
+use Sulu\Bundle\AdminBundle\Metadata\FormMetadata\FieldMetadata;
 use Sulu\Bundle\HeadlessBundle\Content\ContentTypeResolver\CollectionSelectionResolver;
 use Sulu\Bundle\HeadlessBundle\Content\ContentView;
 use Sulu\Bundle\HeadlessBundle\Content\Serializer\CollectionSerializerInterface;
-use Sulu\Bundle\MediaBundle\Entity\CollectionInterface;
+use Sulu\Bundle\MediaBundle\Entity\Collection;
 use Sulu\Bundle\MediaBundle\Entity\CollectionRepository;
-use Sulu\Component\Content\Compat\PropertyInterface;
+use Sulu\Bundle\MediaBundle\Entity\CollectionRepositoryInterface;
+use Sulu\Bundle\MediaBundle\Entity\CollectionType;
 
 class CollectionSelectionResolverTest extends TestCase
 {
@@ -42,10 +44,13 @@ class CollectionSelectionResolverTest extends TestCase
      */
     private $collectionSelectionResolver;
 
+    private FieldMetadata $fieldMetadata;
+
     protected function setUp(): void
     {
         $this->collectionRepository = $this->prophesize(CollectionRepository::class);
         $this->collectionSerializer = $this->prophesize(CollectionSerializerInterface::class);
+        $this->fieldMetadata = new FieldMetadata('collections');
 
         $this->collectionSelectionResolver = new CollectionSelectionResolver(
             $this->collectionRepository->reveal(),
@@ -62,17 +67,15 @@ class CollectionSelectionResolverTest extends TestCase
     {
         $locale = 'en';
 
-        $collection1 = $this->prophesize(CollectionInterface::class);
-        $collection1->getId()->willReturn(1);
-        $collection2 = $this->prophesize(CollectionInterface::class);
-        $collection1->getId()->willReturn(2);
+        $collection1 = $this->createCollection(1);
+        $collection2 = $this->createCollection(2);
 
         $this->collectionRepository->findBy(['id' => [1, 2]])->shouldBeCalled()->willReturn([
-            $collection2->reveal(),
-            $collection1->reveal(),
+            $collection2,
+            $collection1,
         ]);
 
-        $this->collectionSerializer->serialize($collection2->reveal(), $locale)
+        $this->collectionSerializer->serialize($collection2, $locale)
             ->willReturn([
                 'id' => 2,
                 'key' => 'key-2',
@@ -80,7 +83,7 @@ class CollectionSelectionResolverTest extends TestCase
                 'description' => 'description-2',
             ]);
 
-        $this->collectionSerializer->serialize($collection1->reveal(), $locale)
+        $this->collectionSerializer->serialize($collection1, $locale)
             ->willReturn([
                 'id' => 1,
                 'key' => 'key-1',
@@ -88,9 +91,7 @@ class CollectionSelectionResolverTest extends TestCase
                 'description' => 'description-1',
             ]);
 
-        $property = $this->prophesize(PropertyInterface::class);
-
-        $result = $this->collectionSelectionResolver->resolve([1, 2], $property->reveal(), $locale);
+        $result = $this->collectionSelectionResolver->resolve([1, 2], $this->fieldMetadata, $locale);
 
         $this->assertInstanceOf(ContentView::class, $result);
 
@@ -121,9 +122,8 @@ class CollectionSelectionResolverTest extends TestCase
     public function testResolveDataIsNull(): void
     {
         $locale = 'en';
-        $property = $this->prophesize(PropertyInterface::class);
 
-        $result = $this->collectionSelectionResolver->resolve(null, $property->reveal(), $locale);
+        $result = $this->collectionSelectionResolver->resolve(null, $this->fieldMetadata, $locale);
 
         $this->assertSame([], $result->getContent());
 
@@ -133,12 +133,118 @@ class CollectionSelectionResolverTest extends TestCase
     public function testResolveDataIsEmptyArray(): void
     {
         $locale = 'en';
-        $property = $this->prophesize(PropertyInterface::class);
 
-        $result = $this->collectionSelectionResolver->resolve([], $property->reveal(), $locale);
+        $result = $this->collectionSelectionResolver->resolve([], $this->fieldMetadata, $locale);
 
         $this->assertSame([], $result->getContent());
 
         $this->assertSame(['ids' => []], $result->getView());
+    }
+
+    public function testResolveWithNonObjectRepository(): void
+    {
+        $locale = 'en';
+
+        $collectionRepository = $this->prophesize(CollectionRepositoryInterface::class);
+        $collection1 = $this->createCollection(1);
+        $collection2 = $this->createCollection(2);
+
+        $collectionRepository->findCollectionById(1)->shouldBeCalled()->willReturn($collection1);
+        $collectionRepository->findCollectionById(2)->shouldBeCalled()->willReturn($collection2);
+
+        $this->collectionSerializer->serialize($collection1, $locale)
+            ->willReturn([
+                'id' => 1,
+                'key' => 'key-1',
+                'title' => 'title-1',
+                'description' => 'description-1',
+            ]);
+
+        $this->collectionSerializer->serialize($collection2, $locale)
+            ->willReturn([
+                'id' => 2,
+                'key' => 'key-2',
+                'title' => 'title-2',
+                'description' => 'description-2',
+            ]);
+
+        $resolver = new CollectionSelectionResolver(
+            $collectionRepository->reveal(),
+            $this->collectionSerializer->reveal(),
+        );
+
+        $result = $resolver->resolve([1, 2], $this->fieldMetadata, $locale);
+
+        $this->assertInstanceOf(ContentView::class, $result);
+        $this->assertSame(
+            [
+                [
+                    'id' => 1,
+                    'key' => 'key-1',
+                    'title' => 'title-1',
+                    'description' => 'description-1',
+                ],
+                [
+                    'id' => 2,
+                    'key' => 'key-2',
+                    'title' => 'title-2',
+                    'description' => 'description-2',
+                ],
+            ],
+            $result->getContent(),
+        );
+        $this->assertSame(['ids' => [1, 2]], $result->getView());
+    }
+
+    public function testResolveWithNonObjectRepositoryCollectionNotFound(): void
+    {
+        $locale = 'en';
+
+        $collectionRepository = $this->prophesize(CollectionRepositoryInterface::class);
+        $collection1 = $this->createCollection(1);
+
+        $collectionRepository->findCollectionById(1)->shouldBeCalled()->willReturn($collection1);
+        $collectionRepository->findCollectionById(999)->shouldBeCalled()->willReturn(null);
+
+        $this->collectionSerializer->serialize($collection1, $locale)
+            ->willReturn([
+                'id' => 1,
+                'key' => 'key-1',
+                'title' => 'title-1',
+                'description' => 'description-1',
+            ]);
+
+        $resolver = new CollectionSelectionResolver(
+            $collectionRepository->reveal(),
+            $this->collectionSerializer->reveal(),
+        );
+
+        $result = $resolver->resolve([1, 999], $this->fieldMetadata, $locale);
+
+        $this->assertInstanceOf(ContentView::class, $result);
+        $this->assertSame(
+            [
+                [
+                    'id' => 1,
+                    'key' => 'key-1',
+                    'title' => 'title-1',
+                    'description' => 'description-1',
+                ],
+            ],
+            $result->getContent(),
+        );
+        $this->assertSame(['ids' => [1, 999]], $result->getView());
+    }
+
+    private function createCollection(int $id): Collection
+    {
+        $collection = new Collection();
+        $collection->setType(new CollectionType());
+
+        $reflection = new \ReflectionClass($collection);
+        $idProperty = $reflection->getProperty('id');
+        $idProperty->setValue($collection, $id);
+
+        return $collection;
     }
 }
