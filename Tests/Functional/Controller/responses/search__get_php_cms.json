@@ -3,17 +3,29 @@
         "hits": [
             {
                 "_formatted": {
-                    "content": null,
-                    "title": "PHP CMS <mark>Tutorial</mark>"
+                    "content": [
+                        "<mark>Complete Tutorial</mark>",
+                        "Learn to build a CMS"
+                    ],
+                    "title": "<mark>Complete Tutorial</mark>"
                 },
                 "authoredAt": "@string@.isDateTime()",
-                "content": [],
+                "content": [
+                    "Complete Tutorial",
+                    "Learn to build a CMS"
+                ],
                 "id": "@string@",
                 "locale": "de",
                 "media": null,
+                "metadata": {
+                    "excerpt": {
+                        "description": "Learn to build a CMS",
+                        "title": "Complete Tutorial"
+                    }
+                },
                 "resourceId": "@uuid@",
                 "resourceKey": "pages",
-                "title": "PHP CMS Tutorial",
+                "title": "Complete Tutorial",
                 "url": "/php-cms-tutorial",
                 "webspaces": [
                     "sulu_io"

@@ -3,17 +3,29 @@
         "hits": [
             {
                 "_formatted": {
-                    "content": null,
-                    "title": "Web <mark>Development</mark> Guide"
+                    "content": [
+                        "<mark>Development Resources</mark>",
+                        "<mark>Resources</mark> for developers"
+                    ],
+                    "title": "<mark>Development Resources</mark>"
                 },
                 "authoredAt": "@string@.isDateTime()",
-                "content": [],
+                "content": [
+                    "Development Resources",
+                    "Resources for developers"
+                ],
                 "id": "@string@",
                 "locale": "de",
                 "media": null,
+                "metadata": {
+                    "excerpt": {
+                        "description": "Resources for developers",
+                        "title": "Development Resources"
+                    }
+                },
                 "resourceId": "@uuid@",
                 "resourceKey": "pages",
-                "title": "Web Development Guide",
+                "title": "Development Resources",
                 "url": "/web-development",
                 "webspaces": [
                     "sulu_io"
