@@ -3,35 +3,59 @@
         "hits": [
             {
                 "_formatted": {
-                    "content": null,
-                    "title": "Web Development <mark>Guide</mark>"
+                    "content": [
+                        "<mark>CMS Guide</mark>",
+                        "<mark>Guide</mark> about content management"
+                    ],
+                    "title": "<mark>CMS Guide</mark>"
                 },
                 "authoredAt": "@string@.isDateTime()",
-                "content": [],
+                "content": [
+                    "CMS Guide",
+                    "Guide about content management"
+                ],
                 "id": "@string@",
                 "locale": "de",
                 "media": null,
+                "metadata": {
+                    "excerpt": {
+                        "description": "Guide about content management",
+                        "title": "CMS Guide"
+                    }
+                },
                 "resourceId": "@uuid@",
                 "resourceKey": "pages",
-                "title": "Web Development Guide",
-                "url": "/web-development",
+                "title": "CMS Guide",
+                "url": "/content-management",
                 "webspaces": [
                     "sulu_io"
                 ]
             },
             {
                 "_formatted": {
-                    "content": null,
-                    "title": "PHP <mark>CMS</mark> Tutorial"
+                    "content": [
+                        "Complete Tutorial",
+                        "Learn to build a <mark>CMS</mark>"
+                    ],
+                    "title": null
                 },
                 "authoredAt": "@string@.isDateTime()",
-                "content": [],
+                "content": [
+                    "Complete Tutorial",
+                    "Learn to build a CMS"
+                ],
                 "id": "@string@",
                 "locale": "de",
                 "media": null,
+                "metadata": {
+                    "excerpt": {
+                        "description": "Learn to build a CMS",
+                        "title": "Complete Tutorial"
+                    }
+                },
                 "resourceId": "@uuid@",
                 "resourceKey": "pages",
-                "title": "PHP CMS Tutorial",
+                "title": "Complete Tutorial",
                 "url": "/php-cms-tutorial",
                 "webspaces": [
                     "sulu_io"

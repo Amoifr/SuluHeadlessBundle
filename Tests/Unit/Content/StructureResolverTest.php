@@ -392,7 +392,7 @@ class StructureResolverTest extends TestCase
         $dimensionContent = new PageDimensionContent($page);
         $dimensionContent->setTemplateKey('default');
         $dimensionContent->setTemplateData([]);
-        $dimensionContent->setAuthored(new \DateTimeImmutable('2024-01-15 12:00:00'));
+        $dimensionContent->setAuthored(new \DateTimeImmutable('2024-01-15 12:00:00', new \DateTimeZone('UTC')));
 
         $formMetadata = $this->prophesize(FormMetadata::class);
         $formMetadata->getFlatFieldMetadata()->willReturn([]);
