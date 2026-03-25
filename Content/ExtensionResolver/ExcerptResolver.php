@@ -168,8 +168,20 @@ class ExcerptResolver implements ExtensionResolverInterface
 
     private function getEmptyValue(string $fieldType): mixed
     {
-        $arrayTypes = [
+        $nullTypes = [
+            'single_account_selection',
+            'single_article_selection',
+            'single_category_selection',
+            'single_collection_selection',
+            'single_contact_selection',
+            'single_icon_selection',
             'single_media_selection',
+            'single_page_selection',
+            'single_select',
+            'single_snippet_selection',
+        ];
+
+        $arrayTypes = [
             'media_selection',
             'category_selection',
             'tag_selection',
@@ -177,6 +189,10 @@ class ExcerptResolver implements ExtensionResolverInterface
             'page_selection',
             'segment_select',
         ];
+
+        if (\in_array($fieldType, $nullTypes, true)) {
+            return null;
+        }
 
         if (\in_array($fieldType, $arrayTypes, true)) {
             return [];

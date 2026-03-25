@@ -107,7 +107,7 @@ parameters:
 
 		-
 			message: "#^Parameter \\#1 \\$dimensionContent of method Sulu\\\\Bundle\\\\HeadlessBundle\\\\Content\\\\ExtensionResolver\\\\ExcerptResolver\\:\\:resolve\\(\\) expects Sulu\\\\Content\\\\Domain\\\\Model\\\\DimensionContentInterface, object given\\.$#"
-			count: 7
+			count: 8
 			path: Tests/Unit/Content/ExtensionResolver/ExcerptResolverTest.php
 
 		-

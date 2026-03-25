@@ -19,7 +19,7 @@
                     "excerptTitle": "Excerpt Title One",
                     "excerptDescription": "First page excerpt description",
                     "excerptTags": [],
-                    "excerptImage": []
+                    "excerptImage": null
                 },
                 "view": {
                     "title": [],
@@ -49,7 +49,7 @@
                     "excerptTitle": "Excerpt Title Two",
                     "excerptDescription": "Second page excerpt description",
                     "excerptTags": [],
-                    "excerptImage": []
+                    "excerptImage": null
                 },
                 "view": {
                     "title": [],
