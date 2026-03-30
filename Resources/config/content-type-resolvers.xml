@@ -35,6 +35,7 @@
             <argument type="service" id="sulu_headless.structure_resolver"/>
             <argument type="service" id="Sulu\Content\Application\ContentAggregator\ContentAggregatorInterface"/>
             <argument type="service" id="sulu_snippet.snippet_area_repository"/>
+            <argument type="expression">container.hasParameter('sulu.preview') ? parameter('sulu.preview') : false</argument>
 
             <tag name="sulu_headless.content_type_resolver"/>
         </service>
