@@ -82,7 +82,10 @@ class SnippetSelectionResolverTest extends TestCase
         $locale = 'en';
 
         $snippet1 = $this->prophesize(SnippetInterface::class);
+        $snippet1->getUuid()->willReturn('snippet-1');
+
         $snippet2 = $this->prophesize(SnippetInterface::class);
+        $snippet2->getUuid()->willReturn('snippet-2');
 
         $dimensionContent1 = $this->prophesize(SnippetDimensionContentInterface::class);
         $dimensionContent2 = $this->prophesize(SnippetDimensionContentInterface::class);

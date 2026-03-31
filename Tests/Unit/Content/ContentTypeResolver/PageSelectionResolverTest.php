@@ -60,7 +60,6 @@ class PageSelectionResolverTest extends TestCase
             $this->structureResolver->reveal(),
             $this->pageRepository->reveal(),
             $this->contentAggregator->reveal(),
-            false, // showDrafts
         );
     }
 
@@ -188,54 +187,6 @@ class PageSelectionResolverTest extends TestCase
         $this->assertInstanceOf(ContentView::class, $result);
         $this->assertSame([], $result->getContent());
         $this->assertSame(['ids' => []], $result->getView());
-    }
-
-    public function testResolveWithShowDrafts(): void
-    {
-        $locale = 'en';
-
-        $pageSelectionResolver = new PageSelectionResolver(
-            $this->structureResolver->reveal(),
-            $this->pageRepository->reveal(),
-            $this->contentAggregator->reveal(),
-            true,
-        );
-
-        $page1 = new Page('page-id-1');
-        $dimensionContent1 = new PageDimensionContent($page1);
-
-        $this->pageRepository->findBy(
-            [
-                'uuids' => ['page-id-1'],
-                'locale' => $locale,
-                'stage' => DimensionContentInterface::STAGE_DRAFT,
-            ],
-            [],
-            [PageRepositoryInterface::GROUP_SELECT_PAGE_WEBSITE => true],
-        )->willReturn([$page1]);
-
-        $this->contentAggregator->aggregate(
-            $page1,
-            ['locale' => $locale, 'stage' => DimensionContentInterface::STAGE_DRAFT],
-        )->willReturn($dimensionContent1);
-
-        $this->structureResolver->resolveProperties(
-            $dimensionContent1,
-            ['title' => 'title', 'url' => 'url'],
-            $locale,
-        )->willReturn([
-            'id' => 'page-id-1',
-            'template' => 'default',
-            'content' => ['title' => 'Page Title 1', 'url' => '/page-url-1'],
-            'view' => ['title' => [], 'url' => []],
-        ]);
-
-        $result = $pageSelectionResolver->resolve(['page-id-1'], $this->fieldMetadata, $locale, []);
-
-        $this->assertInstanceOf(ContentView::class, $result);
-        $content = $result->getContent();
-        $this->assertIsArray($content);
-        $this->assertCount(1, $content);
     }
 
     public function testResolveWithCustomProperties(): void

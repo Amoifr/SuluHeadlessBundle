@@ -33,7 +33,6 @@ class SnippetSelectionResolver implements ContentTypeResolverInterface
         private StructureResolverInterface $structureResolver,
         private ContentAggregatorInterface $contentAggregator,
         private SnippetAreaRepositoryInterface $snippetAreaRepository,
-        private readonly bool $showDrafts = false,
     ) {
     }
 
@@ -72,13 +71,12 @@ class SnippetSelectionResolver implements ContentTypeResolverInterface
             return new ContentView([], ['ids' => []]);
         }
 
-        $stage = $this->showDrafts ? DimensionContentInterface::STAGE_DRAFT : DimensionContentInterface::STAGE_LIVE;
         $loadLocale = $shadowLocale ?? $locale;
         $snippetEntities = $this->snippetRepository->findBy(
             [
                 'uuids' => $snippetIds,
                 'locale' => $loadLocale,
-                'stage' => $stage,
+                'stage' => DimensionContentInterface::STAGE_LIVE,
                 'load_ghost_content' => true,
             ],
             [],
@@ -89,7 +87,7 @@ class SnippetSelectionResolver implements ContentTypeResolverInterface
         foreach ($snippetEntities as $snippet) {
             $dimensionContent = $this->contentAggregator->aggregate(
                 $snippet,
-                ['locale' => $loadLocale, 'stage' => $stage],
+                ['locale' => $loadLocale, 'stage' => DimensionContentInterface::STAGE_LIVE],
             );
             $snippets[$snippet->getUuid()] = $this->structureResolver->resolve($dimensionContent, $locale, $includeExtension);
         }

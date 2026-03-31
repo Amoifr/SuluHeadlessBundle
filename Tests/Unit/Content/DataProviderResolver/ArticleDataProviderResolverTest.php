@@ -65,7 +65,6 @@ class ArticleDataProviderResolverTest extends TestCase
             $this->structureResolver->reveal(),
             $this->articleRepository->reveal(),
             $this->contentAggregator->reveal(),
-            true,
         );
     }
 
@@ -121,13 +120,13 @@ class ArticleDataProviderResolverTest extends TestCase
         $mergedContent2 = $this->prophesize(DimensionContentInterface::class);
 
         $this->contentAggregator->aggregate(
-            $article1,
-            ['locale' => 'en', 'stage' => 'draft']
+            $article1->reveal(),
+            ['locale' => 'en', 'stage' => DimensionContentInterface::STAGE_LIVE]
         )->willReturn($mergedContent1->reveal());
 
         $this->contentAggregator->aggregate(
-            $article2,
-            ['locale' => 'en', 'stage' => 'draft']
+            $article2->reveal(),
+            ['locale' => 'en', 'stage' => DimensionContentInterface::STAGE_LIVE]
         )->willReturn($mergedContent2->reveal());
 
         $this->structureResolver->resolveProperties(

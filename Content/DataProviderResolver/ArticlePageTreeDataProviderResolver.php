@@ -19,6 +19,7 @@ use Sulu\Bundle\AdminBundle\SmartContent\SmartContentProviderInterface;
 use Sulu\Bundle\HeadlessBundle\Content\StructureResolverInterface;
 use Sulu\Component\Content\Compat\PropertyParameter;
 use Sulu\Content\Application\ContentAggregator\ContentAggregatorInterface;
+use Sulu\Content\Domain\Model\DimensionContentInterface;
 
 class ArticlePageTreeDataProviderResolver implements DataProviderResolverInterface
 {
@@ -32,7 +33,6 @@ class ArticlePageTreeDataProviderResolver implements DataProviderResolverInterfa
         private StructureResolverInterface $structureResolver,
         private ArticleRepositoryInterface $articleRepository,
         private ContentAggregatorInterface $contentAggregator,
-        private bool $showDrafts,
     ) {
     }
 
@@ -73,13 +73,11 @@ class ArticlePageTreeDataProviderResolver implements DataProviderResolverInterfa
             return new DataProviderResult([], false);
         }
 
-        $stage = $this->showDrafts ? 'draft' : 'live';
-
         $articles = $this->articleRepository->findBy(
             [
                 'uuids' => $ids,
                 'locale' => $locale,
-                'stage' => $stage,
+                'stage' => DimensionContentInterface::STAGE_LIVE,
             ],
             [],
             [ArticleRepositoryInterface::GROUP_SELECT_ARTICLE_WEBSITE => true],
@@ -104,7 +102,7 @@ class ArticlePageTreeDataProviderResolver implements DataProviderResolverInterfa
         foreach ($articles as $articleEntity) {
             $dimensionContent = $this->contentAggregator->aggregate(
                 $articleEntity,
-                ['locale' => $locale, 'stage' => $stage],
+                ['locale' => $locale, 'stage' => DimensionContentInterface::STAGE_LIVE],
             );
             $resolvedArticles[$articleEntity->getUuid()] = $this->structureResolver->resolveProperties(
                 $dimensionContent,
