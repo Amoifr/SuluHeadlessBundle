@@ -31,7 +31,6 @@ class PageSelectionResolver implements ContentTypeResolverInterface
         private StructureResolverInterface $structureResolver,
         private PageRepositoryInterface $pageRepository,
         private ContentAggregatorInterface $contentAggregator,
-        private bool $showDrafts,
     ) {
     }
 
@@ -43,12 +42,11 @@ class PageSelectionResolver implements ContentTypeResolverInterface
 
         $propertyMap = $this->getPropertyMap($fieldMetadata);
 
-        $stage = $this->showDrafts ? DimensionContentInterface::STAGE_DRAFT : DimensionContentInterface::STAGE_LIVE;
         $pages = $this->pageRepository->findBy(
             [
                 'uuids' => $data,
                 'locale' => $locale,
-                'stage' => $stage,
+                'stage' => DimensionContentInterface::STAGE_LIVE,
             ],
             [],
             [PageRepositoryInterface::GROUP_SELECT_PAGE_WEBSITE => true],
@@ -58,7 +56,7 @@ class PageSelectionResolver implements ContentTypeResolverInterface
         foreach ($pages as $page) {
             $dimensionContent = $this->contentAggregator->aggregate(
                 $page,
-                ['locale' => $locale, 'stage' => $stage],
+                ['locale' => $locale, 'stage' => DimensionContentInterface::STAGE_LIVE],
             );
 
             $resolvedPages[$page->getUuid()] = $this->structureResolver->resolveProperties(

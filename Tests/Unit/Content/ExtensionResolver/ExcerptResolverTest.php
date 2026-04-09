@@ -168,7 +168,7 @@ class ExcerptResolverTest extends TestCase
         $this->assertSame(['myTags' => ['tag1', 'tag2']], $result->getContent());
     }
 
-    public function testResolveWithNullContent(): void
+    public function testResolveWithNullContentMedia(): void
     {
         $dimensionContent = $this->createExcerptDimensionContent();
         $dimensionContent->getExcerptData()->willReturn([]);
@@ -192,6 +192,32 @@ class ExcerptResolverTest extends TestCase
         );
 
         $this->assertSame(['myMedia' => []], $result->getContent());
+    }
+
+    public function testResolveWithNullContentSingleMedia(): void
+    {
+        $dimensionContent = $this->createExcerptDimensionContent();
+        $dimensionContent->getExcerptData()->willReturn([]);
+
+        $mediaField = new FieldMetadata('excerpt/media');
+        $mediaField->setType('single_media_selection');
+
+        $formMetadata = $this->prophesize(FormMetadata::class);
+        $formMetadata->getFlatFieldMetadata()->willReturn(['excerpt/media' => $mediaField]);
+
+        $this->formMetadataProvider->getMetadata('content_excerpt', 'en', Argument::type('array'))
+            ->willReturn($formMetadata->reveal());
+
+        $this->contentResolver->resolve(null, $mediaField, 'en', Argument::type('array'))
+            ->willReturn(new ContentView(null, []));
+
+        $result = $this->excerptResolver->resolve(
+            $dimensionContent->reveal(),
+            ['myMedia' => 'excerpt.media'],
+            'en'
+        );
+
+        $this->assertSame(['myMedia' => null], $result->getContent());
     }
 
     public function testResolveWithNullContentTextType(): void

@@ -31,7 +31,6 @@ class ArticleSelectionResolver implements ContentTypeResolverInterface
         private StructureResolverInterface $structureResolver,
         private ArticleRepositoryInterface $articleRepository,
         private ContentAggregatorInterface $contentAggregator,
-        private bool $showDrafts,
     ) {
     }
 
@@ -43,12 +42,11 @@ class ArticleSelectionResolver implements ContentTypeResolverInterface
 
         $propertyMap = $this->getPropertyMap($fieldMetadata);
 
-        $stage = $this->showDrafts ? DimensionContentInterface::STAGE_DRAFT : DimensionContentInterface::STAGE_LIVE;
         $articles = $this->articleRepository->findBy(
             [
                 'uuids' => $data,
                 'locale' => $locale,
-                'stage' => $stage,
+                'stage' => DimensionContentInterface::STAGE_LIVE,
             ],
             [],
             [ArticleRepositoryInterface::GROUP_SELECT_ARTICLE_WEBSITE => true],
@@ -58,7 +56,7 @@ class ArticleSelectionResolver implements ContentTypeResolverInterface
         foreach ($articles as $article) {
             $dimensionContent = $this->contentAggregator->aggregate(
                 $article,
-                ['locale' => $locale, 'stage' => $stage],
+                ['locale' => $locale, 'stage' => DimensionContentInterface::STAGE_LIVE],
             );
 
             $resolvedArticles[$article->getUuid()] = $this->structureResolver->resolveProperties(

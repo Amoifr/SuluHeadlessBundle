@@ -18,6 +18,7 @@ use Sulu\Bundle\AdminBundle\SmartContent\SmartContentProviderInterface;
 use Sulu\Bundle\HeadlessBundle\Content\StructureResolverInterface;
 use Sulu\Component\Content\Compat\PropertyParameter;
 use Sulu\Content\Application\ContentAggregator\ContentAggregatorInterface;
+use Sulu\Content\Domain\Model\DimensionContentInterface;
 use Sulu\Page\Domain\Repository\PageRepositoryInterface;
 
 class PageDataProviderResolver implements DataProviderResolverInterface
@@ -32,7 +33,6 @@ class PageDataProviderResolver implements DataProviderResolverInterface
         private StructureResolverInterface $structureResolver,
         private PageRepositoryInterface $pageRepository,
         private ContentAggregatorInterface $contentAggregator,
-        private bool $showDrafts,
     ) {
     }
 
@@ -74,13 +74,11 @@ class PageDataProviderResolver implements DataProviderResolverInterface
             return new DataProviderResult([], false);
         }
 
-        $stage = $this->showDrafts ? 'draft' : 'live';
-
         $pages = $this->pageRepository->findBy(
             [
                 'uuids' => $ids,
                 'locale' => $locale,
-                'stage' => $stage,
+                'stage' => DimensionContentInterface::STAGE_LIVE,
             ],
             [],
             [PageRepositoryInterface::GROUP_SELECT_PAGE_WEBSITE => true],
@@ -105,7 +103,7 @@ class PageDataProviderResolver implements DataProviderResolverInterface
         foreach ($pages as $pageEntity) {
             $dimensionContent = $this->contentAggregator->aggregate(
                 $pageEntity,
-                ['locale' => $locale, 'stage' => $stage],
+                ['locale' => $locale, 'stage' => DimensionContentInterface::STAGE_LIVE],
             );
             $resolvedPages[$pageEntity->getUuid()] = $this->structureResolver->resolveProperties(
                 $dimensionContent,
@@ -133,13 +131,13 @@ class PageDataProviderResolver implements DataProviderResolverInterface
 
         return [
             'categories' => $filters['categories'] ?? [],
-            'categoryOperator' => $filters['categoryOperator'] ?? 'OR',
+            'categoryOperator' => \strtoupper(\is_string($filters['categoryOperator'] ?? null) ? $filters['categoryOperator'] : 'OR'),
             'websiteCategories' => $filters['websiteCategories'] ?? [],
-            'websiteCategoryOperator' => $filters['websiteCategoriesOperator'] ?? 'OR',
+            'websiteCategoryOperator' => \strtoupper(\is_string($filters['websiteCategoriesOperator'] ?? null) ? $filters['websiteCategoriesOperator'] : 'OR'),
             'tags' => $filters['tags'] ?? [],
-            'tagOperator' => $filters['tagOperator'] ?? 'OR',
+            'tagOperator' => \strtoupper(\is_string($filters['tagOperator'] ?? null) ? $filters['tagOperator'] : 'OR'),
             'websiteTags' => $filters['websiteTags'] ?? [],
-            'websiteTagOperator' => $filters['websiteTagsOperator'] ?? 'OR',
+            'websiteTagOperator' => \strtoupper(\is_string($filters['websiteTagsOperator'] ?? null) ? $filters['websiteTagsOperator'] : 'OR'),
             'types' => $filters['types'] ?? [],
             'typesOperator' => 'OR',
             'locale' => $locale,

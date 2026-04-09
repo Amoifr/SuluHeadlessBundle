@@ -83,15 +83,15 @@ class SnippetSelectionResolver implements ContentTypeResolverInterface
             [SnippetRepositoryInterface::GROUP_SELECT_SNIPPET_WEBSITE => true],
         );
 
-        $snippets = [];
+        $snippets = \array_fill_keys($snippetIds, null);
         foreach ($snippetEntities as $snippet) {
             $dimensionContent = $this->contentAggregator->aggregate(
                 $snippet,
                 ['locale' => $loadLocale, 'stage' => DimensionContentInterface::STAGE_LIVE],
             );
-            $snippets[] = $this->structureResolver->resolve($dimensionContent, $locale, $includeExtension);
+            $snippets[$snippet->getUuid()] = $this->structureResolver->resolve($dimensionContent, $locale, $includeExtension);
         }
 
-        return new ContentView($snippets, ['ids' => $snippetIds]);
+        return new ContentView(\array_values(\array_filter($snippets)), ['ids' => $snippetIds]);
     }
 }
