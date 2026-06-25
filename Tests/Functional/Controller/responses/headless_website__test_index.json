@@ -19,6 +19,20 @@
     "changed": "@string@.isDateTime()",
     "creator": null,
     "created": "@string@.isDateTime()",
+    "localizations": {
+        "de": {
+            "locale": "de",
+            "url": "@string@.contains('/test')",
+            "country": "",
+            "alternate": true
+        },
+        "en": {
+            "locale": "en",
+            "url": "@string@.contains('/en')",
+            "country": "",
+            "alternate": false
+        }
+    },
     "extension": {
         "seo": {
             "title": "",
