@@ -58,7 +58,7 @@ class SnippetAreaController
         $webspaceKey = $webspace->getKey();
         $locale = $request->getLocale();
 
-        $includeExtension = $this->getBooleanRequestParameter($request, 'includeExtension', false, false);
+        $includeExtension = 'true' === $request->query->get('includeExtension');
 
         $snippetArea = $this->snippetAreaRepository->findOneBy([
             'webspaceKey' => $webspaceKey,
