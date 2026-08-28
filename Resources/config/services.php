@@ -20,7 +20,6 @@ use Sulu\Bundle\HeadlessBundle\Content\ExtensionResolver\ExtensionResolverProvid
 use Sulu\Bundle\HeadlessBundle\Content\ExtensionResolver\SeoResolver;
 use Sulu\Bundle\HeadlessBundle\Content\StructureResolver;
 use Sulu\Bundle\HeadlessBundle\Content\StructureResolverInterface;
-use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\Reference;
 
 return static function (ContainerConfigurator $container) {
@@ -43,7 +42,7 @@ return static function (ContainerConfigurator $container) {
 
     $services->set('sulu_headless.extension_resolver_provider', ExtensionResolverProvider::class)
         ->args([
-            new TaggedIteratorArgument('sulu_headless.extension_resolver'),
+            tagged_iterator('sulu_headless.extension_resolver'),
         ]);
 
     $services->set('sulu_headless.structure_resolver', StructureResolver::class)
@@ -59,7 +58,7 @@ return static function (ContainerConfigurator $container) {
     $services->set('sulu_headless.content_resolver', ContentResolver::class)
         ->public()
         ->args([
-            new TaggedIteratorArgument('sulu_headless.content_type_resolver', 'type', 'getContentType'),
+            tagged_iterator('sulu_headless.content_type_resolver', indexAttribute: 'type', defaultIndexMethod: 'getContentType'),
         ]);
     $services->alias(ContentResolverInterface::class, 'sulu_headless.content_resolver');
 };

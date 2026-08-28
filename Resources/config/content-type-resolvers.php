@@ -38,7 +38,6 @@ use Sulu\Bundle\HeadlessBundle\Content\ContentTypeResolver\TextEditorResolver;
 use Sulu\Content\Application\ContentAggregator\ContentAggregatorInterface;
 use Sulu\Page\Domain\Repository\PageRepositoryInterface;
 use Sulu\Snippet\Domain\Repository\SnippetRepositoryInterface;
-use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Reference;
 
@@ -136,14 +135,14 @@ return static function (ContainerConfigurator $container) {
         ->args([
             new Reference('sulu_headless.content_resolver'),
             new Reference('sulu_admin.metadata_provider_registry'),
-            new TaggedIteratorArgument('sulu_content.block_visitor'),
+            tagged_iterator('sulu_content.block_visitor'),
         ])
         ->tag('sulu_headless.content_type_resolver');
 
     $services->set('sulu_headless.content_resolver.smart_content', SmartContentResolver::class)
         ->lazy()
         ->args([
-            new TaggedIteratorArgument('sulu_headless.data_provider_resolver', 'provider', 'getDataProvider'),
+            tagged_iterator('sulu_headless.data_provider_resolver', indexAttribute: 'provider', defaultIndexMethod: 'getDataProvider'),
             new Reference('sulu_tag.tag_manager'),
             new Reference('request_stack'),
             new Reference('sulu_tag.tag_request_handler'),
