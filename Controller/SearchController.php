@@ -18,7 +18,6 @@ use CmsIg\Seal\Search\Condition\Condition;
 use Sulu\Bundle\HeadlessBundle\Content\Serializer\MediaSerializerInterface;
 use Sulu\Bundle\MediaBundle\Entity\MediaRepositoryInterface;
 use Sulu\Component\Rest\Exception\MissingParameterException;
-use Sulu\Component\Rest\RequestParametersTrait;
 use Sulu\Component\Webspace\Analyzer\Attributes\RequestAttributes;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,8 +25,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SearchController
 {
-    use RequestParametersTrait;
-
     public function __construct(
         private EngineInterface $engine,
         private MediaRepositoryInterface $mediaRepository,
