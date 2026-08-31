@@ -51,7 +51,7 @@ return static function (ContainerConfigurator $container) {
             '%sulu_http_cache.cache.shared_max_age%',
             '%sulu_headless.navigation.cache_lifetime%',
         ]);
-    $services->alias(AnalyticsController::class, 'sulu_headless.controller.navigation')
+    $services->alias(AnalyticsController::class, 'sulu_headless.controller.analytics')
         ->public();
 
     $services->set('sulu_headless.controller.snippet_area', SnippetAreaController::class)
