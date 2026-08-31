@@ -38,6 +38,9 @@
                 "isVideo": false,
                 "isAudio": false,
                 "isDocument": false,
+                "aiDisclosureDisabled": false,
+                "aiDisclosureIconVariant": "auto",
+                "origin": "unknown",
                 "collection": "@integer@",
                 "type": {
                     "id": "@integer@",
@@ -69,6 +72,9 @@
                 "isVideo": false,
                 "isAudio": false,
                 "isDocument": false,
+                "aiDisclosureDisabled": false,
+                "aiDisclosureIconVariant": "auto",
+                "origin": "unknown",
                 "collection": "@integer@",
                 "type": {
                     "id": "@integer@",
